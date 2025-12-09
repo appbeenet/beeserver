@@ -19,7 +19,7 @@
     # JAR'ı builder'dan çek
     COPY --from=builder /app/target/*.jar app.jar
     
-    # Ortam değişkenleri (gerekirse override edilebilir)s
+    # Ortam değişkenleri (gerekirse override edilebilir)
     ENV JAVA_OPTS=""
     ENV SERVER_PORT=8080
     
