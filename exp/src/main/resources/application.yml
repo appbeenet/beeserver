@@ -1,11 +1,11 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/appbee
-    username: appbee
-    password: appbee
+    url: jdbc:postgresql://10.139.14.251:5432/taskdb
+    username: admin
+    password: password123
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: create-drop
     show-sql: true
 
 server:
