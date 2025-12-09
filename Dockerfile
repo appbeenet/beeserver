@@ -19,11 +19,7 @@
     # JAR'ı builder'dan çek
     COPY --from=builder /app/target/*.jar app.jar
     
-<<<<<<< HEAD
-    # Ortam değişkenleri (gerekirse override edilebilir)s
-=======
     # Ortam değişkenleri (gerekirse override edilebilir)
->>>>>>> dockerfile
     ENV JAVA_OPTS=""
     ENV SERVER_PORT=8080
     
