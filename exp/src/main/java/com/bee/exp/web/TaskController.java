@@ -23,6 +23,12 @@ import java.util.List;
 public class TaskController {
 
     private final TaskService taskService;
+    
+    @GetMapping("/ping")
+    public String ping() {
+        System.out.println("PING /api/tasks/ping hit");
+        return "ok";
+    }
 
     @GetMapping
     public List<TaskResponse> list(

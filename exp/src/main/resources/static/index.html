@@ -186,14 +186,29 @@
           </section>
         </div>
 
-        <!-- Company Panel: Task Create -->
+        <!-- Company Panel -->
         <section id="companyPanel" class="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 shadow hidden">
-          <h2 class="text-lg font-semibold mb-3">Firma Görev Yönetimi</h2>
-          <p class="text-xs text-slate-400 mb-4">
-            Firma hesabınızla giriş yaptıktan sonra buradan junior mühendisler için görev ekleyebilirsiniz.
-          </p>
+          <!-- Firma login DEĞİLKEN görünen tanıtım alanı -->
+          <div id="companyInfo" class="space-y-3">
+            <h2 class="text-lg font-semibold text-yellow-300">AppBee ile firmalar için akıllı görev platformu</h2>
+            <p class="text-sm text-slate-200">
+              AppBee, gerçek proje ihtiyaçlarınızı junior mühendislerle buluşturan, şeffaf ve oyunlaştırılmış bir görev platformudur.
+            </p>
+            <ul class="space-y-2 text-sm text-slate-300">
+              <li>• İhtiyaca göre görev tanımlayıp doğru yeteneklere ulaşma</li>
+              <li>• XP ve görev puanı ile şeffaf performans takibi</li>
+              <li>• Esnek, proje bazlı çalışma modeliyle maliyet optimizasyonu</li>
+              <li>• AppBee ekosisteminde firma görünürlüğü ve işveren markası</li>
+            </ul>
+            <p class="text-xs text-slate-400">
+              Firma hesabınızla giriş yaptığınızda bu panelden junior mühendisler için görev oluşturabilirsiniz.
+            </p>
+          </div>
 
-          <form id="taskCreateForm" class="space-y-3">
+          <!-- Firma login OLDUKTAN SONRA açılan görev oluşturma formu -->
+          <form id="taskCreateForm" class="space-y-3 hidden">
+            <h2 class="text-lg font-semibold mb-3">Firma Görev Yönetimi</h2>
+
             <div>
               <label class="block text-sm mb-1" for="taskTitle">Görev Başlığı</label>
               <input
@@ -261,7 +276,8 @@
 
   <!-- JS -->
   <script>
-    const API_BASE = "http://localhost:8080"; // backend aynı portta ise boş bırak, farklıysa örn: "http://localhost:8080"
+    // Backend aynı Spring Boot uygulaması ise boş bırak:
+    const API_BASE = "";
 
     let authToken = null;
     let currentUser = null;
@@ -292,6 +308,7 @@
     const engineerPanel = document.getElementById("engineerPanel");
     const companyPanel = document.getElementById("companyPanel");
 
+    const companyInfo = document.getElementById("companyInfo");
     const taskCreateForm = document.getElementById("taskCreateForm");
     const taskCreateMsg = document.getElementById("taskCreateMsg");
     const taskTitle = document.getElementById("taskTitle");
@@ -299,14 +316,45 @@
     const taskDifficulty = document.getElementById("taskDifficulty");
     const taskPrice = document.getElementById("taskPrice");
 
+    // Backend login cevabı: { token, userId, role, fullName }
+    function buildCurrentUserFromLogin(data, emailFromForm) {
+      return {
+        id: data.userId,
+        role: data.role,
+        fullName: data.fullName,
+        email: emailFromForm
+      };
+    }
+
+    function isCompanyLoggedIn() {
+      return !!(
+        authToken &&
+        currentUser &&
+        (currentUser.role === "COMPANY" || currentUser.role === "ROLE_COMPANY")
+      );
+    }
+
     function showEngineerPanel() {
       if (engineerPanel) engineerPanel.classList.remove("hidden");
       if (companyPanel) companyPanel.classList.add("hidden");
     }
 
+    function updateCompanyPanel() {
+      if (!companyPanel) return;
+
+      if (isCompanyLoggedIn()) {
+        if (companyInfo) companyInfo.classList.add("hidden");
+        if (taskCreateForm) taskCreateForm.classList.remove("hidden");
+      } else {
+        if (companyInfo) companyInfo.classList.remove("hidden");
+        if (taskCreateForm) taskCreateForm.classList.add("hidden");
+      }
+    }
+
     function showCompanyPanel() {
       if (engineerPanel) engineerPanel.classList.add("hidden");
       if (companyPanel) companyPanel.classList.remove("hidden");
+      updateCompanyPanel();
     }
 
     function refreshAuthUI() {
@@ -330,7 +378,7 @@
         fullNameGroup.classList.add("hidden");
       }
 
-      // Buton ve açıklama metinleri
+      // Buton metni / info
       if (appMode === "engineer") {
         if (authMode === "login") {
           authSubmitBtn.textContent = "Giriş Yap";
@@ -342,7 +390,7 @@
       } else { // company
         if (authMode === "login") {
           authSubmitBtn.textContent = "Firma Girişi";
-          authInfo.innerHTML = "Firma hesabınızla giriş yapın ve sağ taraftan görev ekleyin.";
+          authInfo.innerHTML = "Firma hesabınızla giriş yapın; sağ tarafta görev ekleme paneli açılacak.";
         } else {
           authSubmitBtn.textContent = "Firma Kayıt Ol";
           authInfo.innerHTML = "Firma hesabı oluşturduktan sonra sağ taraftan görev ekleyebilirsiniz.";
@@ -361,7 +409,6 @@
         modeEngineer.classList.remove("text-slate-300");
         modeCompany.classList.remove("bg-slate-800");
         modeCompany.classList.add("text-slate-300");
-
         engineerModeTabs.classList.remove("hidden");
         showEngineerPanel();
       } else {
@@ -369,7 +416,6 @@
         modeCompany.classList.remove("text-slate-300");
         modeEngineer.classList.remove("bg-slate-800");
         modeEngineer.classList.add("text-slate-300");
-
         engineerModeTabs.classList.remove("hidden");
         showCompanyPanel();
       }
@@ -416,12 +462,13 @@
 
             const data = await res.json();
             authToken = data.token || null;
-            currentUser = data.user || { email };
+            currentUser = buildCurrentUserFromLogin(data, email);
 
-            userEmail.textContent = currentUser.email || email;
+            userEmail.textContent = currentUser.email;
             userInfo.classList.remove("hidden");
 
             if (authCard) authCard.classList.add("hidden");
+
             showCompanyPanel();
             return;
           } else {
@@ -461,9 +508,9 @@
 
             const loginData = await loginRes.json();
             authToken = loginData.token || null;
-            currentUser = loginData.user || { email };
+            currentUser = buildCurrentUserFromLogin(loginData, email);
 
-            userEmail.textContent = currentUser.email || email;
+            userEmail.textContent = currentUser.email;
             userInfo.classList.remove("hidden");
 
             if (authCard) authCard.classList.add("hidden");
@@ -487,9 +534,9 @@
 
           const data = await res.json();
           authToken = data.token || null;
-          currentUser = data.user || { email };
+          currentUser = buildCurrentUserFromLogin(data, email);
 
-          userEmail.textContent = currentUser.email || email;
+          userEmail.textContent = currentUser.email;
           userInfo.classList.remove("hidden");
 
           if (authCard) {
@@ -497,15 +544,6 @@
           }
 
           showEngineerPanel();
-
-          if (currentUser.xp !== undefined) {
-            totalXp.textContent = currentUser.xp;
-          }
-          if (currentUser.level !== undefined) {
-            level.textContent = "Seviye " + currentUser.level;
-          } else {
-            level.textContent = "—";
-          }
 
           await loadTasks();
         } else {
@@ -616,15 +654,15 @@
       }
     }
 
-    // Firma task create
+    // Firma task create: sadece COMPANY rolü login ise
     if (taskCreateForm) {
       taskCreateForm.addEventListener("submit", async (e) => {
         e.preventDefault();
         taskCreateMsg.classList.add("hidden");
         taskCreateMsg.textContent = "";
 
-        if (!authToken) {
-          taskCreateMsg.textContent = "Görev eklemek için önce firma girişi yapmalısınız.";
+        if (!isCompanyLoggedIn()) {
+          taskCreateMsg.textContent = "Görev eklemek için önce firma olarak giriş yapmalısınız.";
           taskCreateMsg.classList.remove("hidden");
           taskCreateMsg.classList.remove("text-emerald-400");
           taskCreateMsg.classList.add("text-red-400");
@@ -699,6 +737,7 @@
       }
 
       showEngineerPanel(); // default görünüm
+      updateCompanyPanel();
 
       taskList.innerHTML = '<p class="text-slate-400 text-xs">Giriş yaptıktan sonra atanmış görevlerin burada listelenecek.</p>';
       taskCount.textContent = "0 görev";
