@@ -28,7 +28,7 @@
     </div>
   </header>
 
-  <!-- Ana içerik -->
+  <!-- Main -->
   <main class="flex-1">
     <div class="max-w-5xl mx-auto py-10 px-4 grid md:grid-cols-3 gap-6">
 
@@ -176,11 +176,15 @@
           <!-- Görev Listesi (Engineer) -->
           <section class="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 shadow">
             <div class="flex items-center justify-between mb-3">
-              <h2 class="text-lg font-semibold">Görevler</h2>
+              <h2 class="text-lg font-semibold">Görevler (Görevi Al & Submit)</h2>
               <span id="taskCount" class="text-xs text-slate-400">0 görev</span>
             </div>
             <div id="taskList" class="space-y-2 text-sm">
-              <p class="text-slate-400 text-xs">Giriş yaptıktan sonra atanmış görevlerin burada listelenecek.</p>
+              <p class="text-slate-400 text-xs">
+                Giriş yaptıktan sonra açık görevler burada listelenecek.
+                <br/>
+                Görevi aldığında kart üzerinde <strong>Submit (Çözüm Gönder)</strong> butonu açılacak.
+              </p>
             </div>
             <p id="taskError" class="text-xs text-red-400 mt-3 hidden"></p>
           </section>
@@ -276,7 +280,7 @@
 
   <!-- JS -->
   <script>
-    // Backend aynı Spring Boot uygulaması ise boş bırak:
+    // Backend aynı host/port'taysa boş bırak
     const API_BASE = "";
 
     let authToken = null;
@@ -316,7 +320,6 @@
     const taskDifficulty = document.getElementById("taskDifficulty");
     const taskPrice = document.getElementById("taskPrice");
 
-    // Backend login cevabı: { token, userId, role, fullName }
     function buildCurrentUserFromLogin(data, emailFromForm) {
       return {
         id: data.userId,
@@ -449,7 +452,6 @@
         // ---------- FİRMA MODU ----------
         if (appMode === "company") {
           if (authMode === "login") {
-            // Firma login
             const res = await fetch(API_BASE + "/api/auth/login", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -466,13 +468,10 @@
 
             userEmail.textContent = currentUser.email;
             userInfo.classList.remove("hidden");
-
             if (authCard) authCard.classList.add("hidden");
-
             showCompanyPanel();
             return;
           } else {
-            // Firma register + otomatik login
             const body = {
               email: email,
               password: password,
@@ -495,7 +494,6 @@
               throw new Error(msg);
             }
 
-            // Otomatik login
             const loginRes = await fetch(API_BASE + "/api/auth/login", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -512,7 +510,6 @@
 
             userEmail.textContent = currentUser.email;
             userInfo.classList.remove("hidden");
-
             if (authCard) authCard.classList.add("hidden");
             showCompanyPanel();
             return;
@@ -521,7 +518,6 @@
 
         // ---------- ENGINEER MODU ----------
         if (authMode === "login") {
-          // Engineer login
           const res = await fetch(API_BASE + "/api/auth/login", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -539,15 +535,10 @@
           userEmail.textContent = currentUser.email;
           userInfo.classList.remove("hidden");
 
-          if (authCard) {
-            authCard.classList.add("hidden");
-          }
-
+          if (authCard) authCard.classList.add("hidden");
           showEngineerPanel();
-
           await loadTasks();
         } else {
-          // Engineer register
           const body = {
             email: email,
             password: password,
@@ -599,7 +590,7 @@
         taskCount.textContent = tasks.length + " görev";
 
         if (!tasks.length) {
-          taskList.innerHTML = '<p class="text-xs text-slate-400">Şu an atanmış görevin yok.</p>';
+          taskList.innerHTML = '<p class="text-xs text-slate-400">Şu an açık görev bulunmuyor.</p>';
           return;
         }
 
@@ -608,18 +599,61 @@
           const div = document.createElement("div");
           div.className = "flex items-center justify-between bg-slate-950/60 border border-slate-800 rounded-xl px-3 py-2";
 
+          const difficulty = task.difficulty || "-";
+          const price = (task.price !== undefined && task.price !== null) ? task.price : "";
+          const status = task.status || "";
+
+          const isEngineer = currentUser &&
+            (currentUser.role === "ENGINEER" || currentUser.role === "ROLE_ENGINEER");
+
+          const claimedByMe = !!task.claimedByMe;
+          const submittedByMe = !!task.submittedByMe;
+
+          let actionHtml = "";
+
+          if (isEngineer) {
+            if (!claimedByMe) {
+              // Henüz almamış → Görevi Al
+              actionHtml = `
+                <button
+                  class="text-xs px-3 py-1 rounded-full border border-yellow-400 text-yellow-300 hover:bg-yellow-400 hover:text-slate-900 transition"
+                  onclick="claimTask('${task.id}')"
+                >
+                  Görevi Al
+                </button>`;
+            } else if (claimedByMe && !submittedByMe) {
+              // Almış ama submit etmemiş → Submit
+              actionHtml = `
+                <button
+                  class="text-xs px-3 py-1 rounded-full border border-emerald-400 text-emerald-300 hover:bg-emerald-400 hover:text-slate-900 transition"
+                  onclick="submitTaskWithPrompt('${task.id}')"
+                >
+                  Submit (Çözüm Gönder)
+                </button>`;
+            } else if (submittedByMe) {
+              // Submit etmiş → etiket
+              actionHtml = `
+                <span class="text-[10px] px-2 py-1 rounded-full border border-emerald-400 text-emerald-300">
+                  Submit edildi • Onay bekliyor
+                </span>`;
+            }
+          }
+
           div.innerHTML = `
             <div>
               <p class="font-medium text-sm">${task.title || "Görev"}</p>
               <p class="text-xs text-slate-400">${task.description || ""}</p>
-              <p class="text-xs text-yellow-300 mt-1">+${task.xp || 0} XP</p>
+              <p class="text-xs text-slate-500 mt-1">
+                Durum: <span class="text-slate-200">${status || "-"}</span>
+              </p>
+              <p class="text-xs text-slate-500">
+                Zorluk: <span class="text-slate-200">${difficulty}</span>
+                ${price !== "" ? ' • Ödül: <span class="text-yellow-300">' + price + '</span>' : ""}
+              </p>
             </div>
-            <button
-              class="text-xs px-3 py-1 rounded-full border border-yellow-400 text-yellow-300 hover:bg-yellow-400 hover:text-slate-900 transition"
-              onclick="completeTask('${task.id}')"
-            >
-              Tamamla
-            </button>
+            <div class="ml-3">
+              ${actionHtml}
+            </div>
           `;
           taskList.appendChild(div);
         });
@@ -630,27 +664,86 @@
       }
     }
 
-    async function completeTask(taskId) {
+    // Junior: Görevi al
+    async function claimTask(taskId) {
+      if (!authToken) {
+        alert("Görev alabilmek için önce giriş yapmalısın.");
+        return;
+      }
+
       try {
-        const res = await fetch(API_BASE + "/api/tasks/" + taskId + "/complete", {
+        const res = await fetch(API_BASE + "/api/tasks/" + taskId + "/claim", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            ...(authToken ? { "Authorization": "Bearer " + authToken } : {})
+            "Authorization": "Bearer " + authToken
           }
         });
 
         if (!res.ok) {
-          throw new Error("Görev tamamlanamadı.");
+          let msg = "Görev alınamadı.";
+          try {
+            const errData = await res.json();
+            if (errData && errData.message) msg = errData.message;
+          } catch (_) {}
+          throw new Error(msg);
         }
 
-        const data = await res.json();
-        if (data.totalXp !== undefined) totalXp.textContent = data.totalXp;
-        if (data.level !== undefined) level.textContent = "Seviye " + data.level;
-
+        alert("Görev başarıyla üzerine alındı. Kartta şimdi Submit butonu gözükecek.");
         await loadTasks();
       } catch (err) {
-        alert(err.message || "Görev tamamlanırken hata oluştu.");
+        console.error(err);
+        alert(err.message || "Görev alınırken bir hata oluştu.");
+      }
+    }
+
+    // Junior: Görevi submit et (prompt ile)
+    async function submitTaskWithPrompt(taskId) {
+      if (!authToken) {
+        alert("Submit edebilmek için giriş yapmalısın.");
+        return;
+      }
+
+      const notes = prompt(
+        "Bu görev için yaptığın çalışmayı kısaca özetle (log / notlar / yapılan adımlar):",
+        ""
+      );
+      if (notes === null) return;
+
+      const attachmentUrl = prompt(
+        "İstersen doküman / repo / config linki ekle (boş bırakabilirsin):",
+        ""
+      );
+
+      const body = {
+        notes: notes,
+        attachmentUrl: attachmentUrl || null
+      };
+
+      try {
+        const res = await fetch(API_BASE + "/api/tasks/" + taskId + "/submit", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + authToken
+          },
+          body: JSON.stringify(body)
+        });
+
+        if (!res.ok) {
+          let msg = "Görev submit edilemedi.";
+          try {
+            const errData = await res.json();
+            if (errData && errData.message) msg = errData.message;
+          } catch (_) {}
+          throw new Error(msg);
+        }
+
+        alert("Görev başarıyla submit edildi. Mentor / firma onayından sonra XP kazanacaksın.");
+        await loadTasks();
+      } catch (err) {
+        console.error(err);
+        alert(err.message || "Görev submit edilirken bir hata oluştu.");
       }
     }
 
@@ -732,14 +825,11 @@
       currentUser = null;
       userInfo.classList.add("hidden");
 
-      if (authCard) {
-        authCard.classList.remove("hidden");
-      }
-
+      if (authCard) authCard.classList.remove("hidden");
       showEngineerPanel(); // default görünüm
       updateCompanyPanel();
 
-      taskList.innerHTML = '<p class="text-slate-400 text-xs">Giriş yaptıktan sonra atanmış görevlerin burada listelenecek.</p>';
+      taskList.innerHTML = '<p class="text-slate-400 text-xs">Giriş yaptıktan sonra açık görevler burada listelenecek.</p>';
       taskCount.textContent = "0 görev";
       totalXp.textContent = "0";
       level.textContent = "—";

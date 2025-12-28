@@ -14,4 +14,6 @@ public class TaskResponse {
     private TaskStatus status;
     private String companyName;
     private String assignedEngineerName;
+    private Boolean claimedByMe;    // Bu junior bu görevi aldı mı?
+    private Boolean submittedByMe;  // Bu junior bu görevi submit etti mi?
 }

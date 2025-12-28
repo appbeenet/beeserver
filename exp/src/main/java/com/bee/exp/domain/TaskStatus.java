@@ -4,5 +4,6 @@ public enum TaskStatus {
     PUBLISHED,
     CLAIMED,
     SUBMITTED,
-    COMPLETED
+    COMPLETED, 
+    APPROVED
 }
