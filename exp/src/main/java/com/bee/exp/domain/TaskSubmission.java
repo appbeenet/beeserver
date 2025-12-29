@@ -23,7 +23,7 @@ public class TaskSubmission {
     @JoinColumn(name = "task_id")
     private Task task;
 
-    // Hangi engineer (junior) submit etti
+    // Junior / Engineer
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "engineer_id")
     private User engineer;
@@ -35,18 +35,14 @@ public class TaskSubmission {
 
     private Instant createdAt;
 
-    // ✅ Onay durumu (mentor/firma)
-    private Boolean approved;      // null/false: onaysız, true: onaylı
+    // Onay durumu
+    private Boolean approved;
 
     private Instant approvedAt;
 
     @PrePersist
     public void onCreate() {
-        if (createdAt == null) {
-            createdAt = Instant.now();
-        }
-        if (approved == null) {
-            approved = false;
-        }
+        if (createdAt == null) createdAt = Instant.now();
+        if (approved == null) approved = false;
     }
 }

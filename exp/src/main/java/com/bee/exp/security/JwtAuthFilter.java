@@ -26,18 +26,18 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private final UserRepository userRepository;
 
     @Override
-    protected void doFilterInternal(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            FilterChain filterChain
-    ) throws ServletException, IOException {
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain)
+            throws ServletException, IOException {
 
         String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
 
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);
             try {
-                Claims claims = jwtUtil.parse(token).getBody();
+                // 👇 Artık Jwts yok, sadece JwtUtil
+                Claims claims = jwtUtil.getClaims(token);
                 Long userId = Long.parseLong(claims.getSubject());
                 String roleName = claims.get("role", String.class);
 
