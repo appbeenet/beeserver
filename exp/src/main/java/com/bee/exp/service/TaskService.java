@@ -24,7 +24,7 @@ public class TaskService {
     private final TaskRepository taskRepository;
     private final TaskSubmissionRepository taskSubmissionRepository;
     private final CompanyRepository companyRepository;
-    private final XpService xpService; // sende adı farklıysa uyarlarsın
+    private final XpService xpService;
 
     /**
      * JUNIOR / ENGINEER:
@@ -60,7 +60,7 @@ public class TaskService {
 
         return openTasks;
     }
-    
+
     /**
      * COMPANY:
      * Bu kullanıcının sahibi olduğu şirketin görevleri.
@@ -73,7 +73,7 @@ public class TaskService {
         // 1. Görevleri çek
         List<Task> tasks = companyRepository.findByOwner(currentUser)
                 .map(taskRepository::findByCompany)
-                .orElse(new ArrayList<>()); // ArrayList döndür ki üzerinde değişiklik yapabilelim
+                .orElse(new ArrayList<>());
 
         // --- MİNİMAL DOKUNUŞ ---
         // Eğer Task tablosunda 'assignedTo' boşsa, gidip Submission tablosundan bulup içine koyuyoruz.
@@ -100,14 +100,13 @@ public class TaskService {
         if (currentUser == null) {
             throw new RuntimeException("Unauthenticated");
         }
-    
+
         Company company = companyRepository
                 .findByOwner(currentUser)
                 .orElseGet(() -> {
                     // Otomatik company yarat
                     Company c = new Company();
                     c.setOwner(currentUser);
-                    // fullName veya email'den default isim türet
                     String defaultName = currentUser.getFullName() != null
                             ? currentUser.getFullName() + " Company"
                             : currentUser.getEmail() + " Company";
@@ -115,21 +114,19 @@ public class TaskService {
                     c.setDescription("Auto-created company profile for " + defaultName);
                     return companyRepository.save(c);
                 });
-    
+
         task.setCompany(company);
         task.setStatus(TaskStatus.PUBLISHED);
         task.setCreatedAt(Instant.now());
         task.setUpdatedAt(Instant.now());
-    
+
         return taskRepository.save(task);
     }
-    
+
 
     /**
      * JUNIOR:
      * Görevi üzerine alma.
-     * - Task üzerinde herhangi bir kilit / status değişikliği yapmıyoruz
-     * - Sadece TaskSubmission ile (task, engineer) ilişkisini kuruyoruz.
      */
     public Task claimTask(Long taskId, User currentUser) {
         if (currentUser == null) {
@@ -150,21 +147,17 @@ public class TaskService {
                     });
 
             // 2. Task Tablosunu Güncelle (Statü: CLAIMED)
-            task.setAssignedTo(currentUser);     // Kişiyi buraya da yaz
-            task.setStatus(TaskStatus.CLAIMED);  // Statüyü CLAIMED yap
+            task.setAssignedTo(currentUser);
+            task.setStatus(TaskStatus.CLAIMED);
             return taskRepository.save(task);
         }
 
         return task;
     }
 
-
-
-
     /**
      * JUNIOR:
      * Görevi yaptıktan sonra log / config / link ile SUBMIT eder.
-     * Her junior için aynı task'tan ayrı bir submission tutulur.
      */
     public TaskSubmission submitTask(Long taskId,
                                      User currentUser,
@@ -188,16 +181,13 @@ public class TaskService {
 
         submission.setNotes(notes);
         submission.setAttachmentUrl(attachmentUrl);
-        // createdAt alanı varsa entity içinde @PrePersist ile set edebilirsin
 
         return taskSubmissionRepository.save(submission);
     }
 
     /**
-     * MENTOR / COMPANY:
-     * Şimdilik eski modeldeki gibi Task bazlı approve bırakıyorum.
-     * Multi-junior için ideal olan, submission bazlı approve (submissionId ile)
-     * ama onu ayrı bir adımda tasarlayalım istersen.
+     * COMPANY:
+     * Görevi onayla (Approve)
      */
     public Task approveTask(Long taskId, User currentUser) {
         if (currentUser == null) {
@@ -207,14 +197,23 @@ public class TaskService {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new RuntimeException("Task not found"));
 
-        // Burayı multi-junior senaryoya göre yeniden tasarlamak mantıklı,
-        // şimdilik sadece task'i COMPLETED yapıyoruz.
+        // Güvenlik kontrolü: Görevi onaylayan kişi, şirketin sahibi olmalı
+        if (task.getCompany() != null && !task.getCompany().getOwner().getId().equals(currentUser.getId())) {
+            throw new RuntimeException("Bu görevi onaylama yetkiniz yok.");
+        }
+
         task.setStatus(TaskStatus.COMPLETED);
         task.setUpdatedAt(Instant.now());
-        taskRepository.save(task);
+        Task savedTask = taskRepository.save(task);
 
-        // XP atama mantığını ileride submission bazlı hale getirelim.
-        return task;
+        // --- XP UPDATE ---
+        // Görevi yapan kişiye XP kazandır
+        if (savedTask.getAssignedTo() != null) {
+            //xpService.awardXp(savedTask.getAssignedTo(), savedTask.getDifficulty());
+        }
+        // -----------------
+
+        return savedTask;
     }
 
     public Task completeTask(Long taskId, User currentUser) {
@@ -222,7 +221,23 @@ public class TaskService {
     }
 
     public List<Task> listPublishedTasks() {
-        // Sadece statüsü PUBLISHED olan (henüz alınmamış) görevleri döner
         return taskRepository.findByStatus(TaskStatus.PUBLISHED);
+    }
+
+    // --- EKSİK OLAN METOD BURAYA EKLENDİ ---
+    /**
+     * COMPANY:
+     * Bir göreve yapılmış başvuruları listeler.
+     */
+    public List<TaskSubmission> getSubmissionsForTask(Long taskId, User companyUser) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new RuntimeException("Görev bulunamadı"));
+
+        // Güvenlik: Sadece görevin sahibi olan şirket görebilir
+        if (task.getCompany() == null || !task.getCompany().getOwner().getId().equals(companyUser.getId())) {
+            throw new RuntimeException("Bu başvuruları görme yetkiniz yok.");
+        }
+
+        return taskSubmissionRepository.findByTask(task);
     }
 }

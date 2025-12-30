@@ -1,16 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Plus, Layout, Save, Loader2, DollarSign, ListFilter, User, AlertCircle, CheckCircle, Clock, PlayCircle } from 'lucide-react';
+import { Plus, Layout, Save, Loader2, DollarSign, ListFilter, User, CheckCircle, Clock, PlayCircle, Eye, Check } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import { motion } from 'framer-motion';
 
+// 👇 YENİ: Modal Bileşenini Import Et (Dosya yolunun doğru olduğundan emin ol)
+import CompanySubmissionsModal from '../components/CompanySubmissionsModal';
 const CompanyDashboard = () => {
     // --- STATE YÖNETİMİ ---
     const [tasks, setTasks] = useState([]);
     const [loadingTasks, setLoadingTasks] = useState(true);
 
+    // 👇 YENİ: Modal State'leri
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [selectedTaskId, setSelectedTaskId] = useState(null);
+
     // Giriş yapan kullanıcının adını tutacak state
     const [currentUserFullName, setCurrentUserFullName] = useState('');
+
 
     const [taskData, setTaskData] = useState({
         title: '',
@@ -35,7 +42,7 @@ const CompanyDashboard = () => {
         }
     }, []);
 
-    // --- GÜNCELLENMİŞ VERİ ÇEKME FONKSİYONU ---
+    // --- VERİ ÇEKME FONKSİYONU ---
     const fetchTasks = async (filterName) => {
         try {
             const token = localStorage.getItem('token');
@@ -102,6 +109,12 @@ const CompanyDashboard = () => {
         }
     };
 
+    // 👇 YENİ: Başvuruları Açma Fonksiyonu
+    const handleOpenSubmissions = (taskId) => {
+        setSelectedTaskId(taskId);
+        setIsModalOpen(true);
+    };
+
     // --- UI YARDIMCILARI ---
 
     // 1. Zorluk Rengi
@@ -114,7 +127,7 @@ const CompanyDashboard = () => {
         }
     };
 
-    // 2. Statü Rozeti (Görsel İyileştirme)
+    // 2. Statü Rozeti
     const getStatusBadge = (status) => {
         switch(status) {
             case 'PUBLISHED':
@@ -130,13 +143,10 @@ const CompanyDashboard = () => {
         }
     };
 
-    // 3. MÜHENDİS İSİMLERİNİ AYIRMA (Backend "Ali, Veli" gönderirse burası ayırır)
+    // 3. Mühendis İsimleri
     const renderEngineers = (nameString) => {
         if (!nameString) return <span className="text-gray-400 text-xs italic">- Bekleniyor -</span>;
-
-        // Virgülle gelen isimleri ayırıp dizi yapıyoruz
         const names = nameString.split(',').map(n => n.trim());
-
         return (
             <div className="flex flex-wrap gap-2">
                 {names.map((name, index) => (
@@ -161,7 +171,7 @@ const CompanyDashboard = () => {
                 <div>
                     <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Şirket Paneli</h1>
                     <p className="text-gray-500 dark:text-gray-400">
-                        Hoşgeldin, <span className="font-semibold text-indigo-500">{currentUserFullName || 'Misafir'}</span>. Görevlerini buradan yönetebilirsin.
+                        Hoşgeldin, <span className="font-semibold text-indigo-500">{currentUserFullName || 'Misafir'}</span>.
                     </p>
                 </div>
             </div>
@@ -247,14 +257,13 @@ const CompanyDashboard = () => {
                     </form>
                 </motion.div>
 
-                {/* SAĞ TARAF: BİLGİ KARTI (SENİN TASARIMIN) */}
+                {/* SAĞ TARAF: BİLGİ KARTI */}
                 <motion.div
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
                     className="bg-gradient-to-br from-slate-800 to-slate-900 text-white rounded-2xl p-8 relative overflow-hidden flex flex-col justify-between h-full max-h-[500px]"
                 >
                     <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500 blur-3xl opacity-20 rounded-full"></div>
-
                     <div>
                         <h3 className="text-xl font-bold mb-6">İpuçları</h3>
                         <ul className="space-y-6 text-slate-300">
@@ -272,7 +281,6 @@ const CompanyDashboard = () => {
                             </li>
                         </ul>
                     </div>
-
                     <div className="mt-8 pt-8 border-t border-slate-700">
                         <div className="text-sm text-slate-400">Aktif Görevler</div>
                         <div className="text-4xl font-bold mt-2 text-white">{tasks.length}</div>
@@ -298,14 +306,7 @@ const CompanyDashboard = () => {
                     <div className="text-center py-10 text-gray-500">Yükleniyor...</div>
                 ) : tasks.length === 0 ? (
                     <div className="text-center py-12 bg-gray-50 dark:bg-slate-800/50 rounded-xl border border-dashed border-gray-300 dark:border-slate-700">
-                        {!currentUserFullName ? (
-                            <div className="flex flex-col items-center gap-2 text-amber-500">
-                                <AlertCircle />
-                                <p>Kullanıcı bilgisi alınamadı. Lütfen tekrar giriş yapın.</p>
-                            </div>
-                        ) : (
-                            <p className="text-gray-500">Henüz yayınladığınız bir görev bulunmuyor.</p>
-                        )}
+                        <p className="text-gray-500">Henüz yayınladığınız bir görev bulunmuyor.</p>
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
@@ -316,7 +317,8 @@ const CompanyDashboard = () => {
                                 <th className="py-4 px-4 font-medium">Fiyat</th>
                                 <th className="py-4 px-4 font-medium">Zorluk</th>
                                 <th className="py-4 px-4 font-medium">Durum</th>
-                                <th className="py-4 px-4 font-medium">Başvuranlar (Mühendisler)</th>
+                                <th className="py-4 px-4 font-medium">Mühendis</th>
+                                <th className="py-4 px-4 font-medium">İşlemler</th>
                             </tr>
                             </thead>
                             <tbody className="text-gray-800 dark:text-gray-200">
@@ -330,12 +332,27 @@ const CompanyDashboard = () => {
                                             </span>
                                     </td>
                                     <td className="py-4 px-4 text-sm">
-                                        {/* Yeni Statü Fonksiyonunu Kullanıyoruz */}
                                         {getStatusBadge(task.status)}
                                     </td>
                                     <td className="py-4 px-4">
-                                        {/* İsimleri Parçalayan Fonksiyonu Kullanıyoruz */}
                                         {renderEngineers(task.assignedEngineerName)}
+                                    </td>
+
+                                    {/* --- GÜNCELLENEN İŞLEM SÜTUNU --- */}
+                                    <td className="py-4 px-4">
+                                        {/* Görev tamamlandıysa onaylandı yaz, değilse Başvurular butonunu göster */}
+                                        {task.status === 'APPROVED' || task.status === 'COMPLETED' ? (
+                                            <span className="text-green-600 text-xs font-bold flex items-center gap-1">
+                                                <CheckCircle size={14} /> Onaylandı
+                                            </span>
+                                        ) : (
+                                            <button
+                                                onClick={() => handleOpenSubmissions(task.id)}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-colors shadow-sm"
+                                            >
+                                                <Eye size={14} /> Başvurular
+                                            </button>
+                                        )}
                                     </td>
                                 </tr>
                             ))}
@@ -344,6 +361,23 @@ const CompanyDashboard = () => {
                     </div>
                 )}
             </motion.div>
+
+            {isModalOpen && selectedTaskId && (
+                <CompanySubmissionsModal
+                    taskId={selectedTaskId}
+                    isOpen={isModalOpen}
+                    onClose={() => {
+                        setIsModalOpen(false);
+                        setSelectedTaskId(null);
+                    }}
+                    onTaskUpdated={() => {
+                        // Görev onaylandıktan sonra listeyi yenile
+                        fetchTasks();
+                    }}
+                />
+            )}
+
+            {/* Ana kapsayıcı div'in kapanışı (En dıştaki div) */}
         </div>
     );
 };

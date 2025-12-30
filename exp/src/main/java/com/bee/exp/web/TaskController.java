@@ -30,7 +30,7 @@ public class TaskController {
     private final TaskSubmissionRepository taskSubmissionRepository;
     private final UserRepository userRepository;
 
-    // --- KRİTİK DÜZELTME BURADA ---
+    // --- Kullanıcı Çözümleme Yardımcısı ---
     private User resolveUser(Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated()) {
             throw new RuntimeException("Oturum açılmamış (Unauthenticated).");
@@ -39,38 +39,29 @@ public class TaskController {
         Object principal = authentication.getPrincipal();
         String email;
 
-        // 1. İHTİMAL: Principal zaten bizim User nesnemizdir (Senin hatan buradaydı)
         if (principal instanceof User) {
             email = ((User) principal).getEmail();
-        }
-        // 2. İHTİMAL: Spring UserDetails objesidir
-        else if (principal instanceof UserDetails) {
+        } else if (principal instanceof UserDetails) {
             email = ((UserDetails) principal).getUsername();
-        }
-        // 3. İHTİMAL: Doğrudan String email gelmiştir
-        else if (principal instanceof String) {
+        } else if (principal instanceof String) {
             email = (String) principal;
-        }
-        // 4. İHTİMAL: Principal java.security.Principal tipindedir
-        else if (principal instanceof Principal) {
+        } else if (principal instanceof Principal) {
             email = ((Principal) principal).getName();
-        }
-        else {
+        } else {
             email = principal.toString();
         }
 
-        // Elde ettiğimiz temiz email ile veritabanından taze kayıt çekiyoruz
         String finalEmail = email;
         return userRepository.findByEmail(finalEmail)
-                .orElseThrow(() -> new RuntimeException("Kullanıcı veritabanında bulunamadı. Aranan email: " + finalEmail));
+                .orElseThrow(() -> new RuntimeException("Kullanıcı veritabanında bulunamadı: " + finalEmail));
     }
-    // -----------------------------
 
     @GetMapping("/ping")
     public String ping() {
         return "ok";
     }
 
+    // 1. Görevleri Listele
     @GetMapping
     public List<TaskResponse> list(
             Authentication authentication,
@@ -78,19 +69,13 @@ public class TaskController {
             @RequestParam(name = "difficulty", required = false) TaskDifficulty difficulty
     ) {
         User currentUser = resolveUser(authentication);
-
         List<Task> tasks;
 
-        // 1. Eğer Mühendis ise: Kendi aldıkları + Açık görevler
         if (currentUser != null && "ENGINEER".equalsIgnoreCase(String.valueOf(currentUser.getRole()))) {
             tasks = taskService.listTasksForEngineer(currentUser);
-        }
-        // 2. Eğer Şirket ise: SADECE kendi oluşturduğu görevler (YENİ EKLENEN KISIM)
-        else if (currentUser != null && "COMPANY".equalsIgnoreCase(String.valueOf(currentUser.getRole()))) {
+        } else if (currentUser != null && "COMPANY".equalsIgnoreCase(String.valueOf(currentUser.getRole()))) {
             tasks = taskService.listTasksForCompany(currentUser);
-        }
-        // 3. Giriş yapmamış veya başka bir rol ise: Sadece yayındaki görevler
-        else {
+        } else {
             tasks = taskService.listPublishedTasks();
         }
 
@@ -99,6 +84,7 @@ public class TaskController {
                 .toList();
     }
 
+    // 2. Görev Oluştur
     @PostMapping
     public ResponseEntity<TaskResponse> create(
             Authentication authentication,
@@ -117,6 +103,7 @@ public class TaskController {
         return ResponseEntity.ok(toResponse(saved));
     }
 
+    // 3. Görevi Sahiplen (Claim)
     @PostMapping("/{id}/claim")
     public ResponseEntity<TaskResponse> claim(
             @PathVariable("id") Long id,
@@ -127,6 +114,7 @@ public class TaskController {
         return ResponseEntity.ok(toResponse(t));
     }
 
+    // 4. Görevi Teslim Et (Submit)
     @PostMapping("/{id}/submit")
     public ResponseEntity<Long> submit(
             @PathVariable("id") Long id,
@@ -138,6 +126,7 @@ public class TaskController {
         return ResponseEntity.ok(s.getId());
     }
 
+    // 5. Görevi Onayla (Approve)
     @PostMapping("/{id}/approve")
     public ResponseEntity<TaskResponse> approve(
             @PathVariable("id") Long id,
@@ -147,6 +136,21 @@ public class TaskController {
         Task t = taskService.approveTask(id, currentUser);
         return ResponseEntity.ok(toResponse(t));
     }
+
+    // 6. Başvuruları Getir (Get Submissions) - EKSİK OLAN KISIM BUYDU
+    @GetMapping("/{id}/submissions")
+    public ResponseEntity<List<TaskSubmission>> getSubmissions(
+            @PathVariable("id") Long id,
+            Authentication authentication
+    ) {
+        User currentUser = resolveUser(authentication);
+        // Bu metodu TaskService içinde tanımlamış olman gerekiyor.
+        // Eğer TaskService'de yoksa hata verir.
+        List<TaskSubmission> submissions = taskService.getSubmissionsForTask(id, currentUser);
+        return ResponseEntity.ok(submissions);
+    }
+
+    // --- Helper Methods ---
 
     private TaskResponse toResponse(Task t) {
         return toResponse(t, null);

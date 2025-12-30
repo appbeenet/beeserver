@@ -1,34 +1,49 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, CheckCircle2, Clock, Coins, Trophy, Github, Loader2, Building, Send, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
-// 👇 Servis fonksiyonlarımızı import ettik
+// Servis fonksiyonlarını import ediyoruz (taskService.js dosyanın yolu doğru olmalı)
 import { claimTask, submitTask } from '../services/taskService';
 
 const TaskDetailModal = ({ task, isOpen, onClose, onUpdate }) => {
     const [loading, setLoading] = useState(false);
 
-    // Form Verileri
+    // Form Verileri (Link ve Notlar)
     const [submissionData, setSubmissionData] = useState({
         notes: '',
         attachmentUrl: ''
     });
 
+    // Modal her açıldığında veya görev değiştiğinde formu temizle
+    useEffect(() => {
+        if (isOpen) {
+            setSubmissionData({ notes: '', attachmentUrl: '' });
+        }
+    }, [isOpen, task]);
+
     if (!isOpen || !task) return null;
+
+    // --- DURUM KONTROLLERİ ---
+    // Bu mantık backend'den gelen "claimedByMe" ve "submittedByMe" flaglerine dayanır.
+    const isAvailable = !task.claimedByMe && !task.submittedByMe; // Henüz almadım
+    const isActive = task.claimedByMe && !task.submittedByMe;     // Aldım, çalışıyorum
+    const isSubmitted = task.submittedByMe;                       // Teslim ettim
 
     // --- 1. GÖREVİ ÜZERİNE ALMA (CLAIM) ---
     const handleClaim = async () => {
         setLoading(true);
         try {
-            // Servis fonksiyonunu kullanıyoruz (Token otomatik ekleniyor)
+            // Sadece görevi "Assign" ediyoruz, veri göndermiyoruz.
             await claimTask(task.id);
 
-            toast.success("Görev alındı! Kodlamaya başla. 🚀");
-            if (onUpdate) onUpdate(); // Listeyi yenile
-            onClose(); // Modalı kapat
+            toast.success("Görev alındı! Şimdi proje linkini girebilirsin. 🚀");
+
+            // ÖNEMLİ: Listeyi yeniliyoruz ki 'claimedByMe' true olsun ve arayüz değişsin.
+            // Modalı KAPATMIYORUZ, böylece kullanıcı hemen formu görüyor.
+            if (onUpdate) await onUpdate();
+
         } catch (error) {
             console.error(error);
-            // Hata mesajını yakala (Backend'den geliyorsa)
             const errorMsg = error.response?.data?.message || "Görevi alırken hata oluştu.";
             toast.error(errorMsg);
         } finally {
@@ -47,15 +62,18 @@ const TaskDetailModal = ({ task, isOpen, onClose, onUpdate }) => {
 
         setLoading(true);
         try {
-            // Servis fonksiyonunu kullanıyoruz
+            // Link ve notları gönderiyoruz
             await submitTask(task.id, {
                 notes: submissionData.notes,
                 attachmentUrl: submissionData.attachmentUrl
             });
 
-            toast.success("Çözüm gönderildi! Onay bekleniyor. 🎉");
-            if (onUpdate) onUpdate(); // Listeyi yenile
-            onClose(); // Modalı kapat
+            toast.success("Çözüm başarıyla gönderildi! 🎉");
+
+            // ÖNEMLİ: Listeyi yeniliyoruz ki 'submittedByMe' true olsun.
+            // Modalı kapatmıyoruz ki kullanıcı "Başarılı" ekranını görsün.
+            if (onUpdate) await onUpdate();
+
         } catch (error) {
             console.error(error);
             const errorMsg = error.response?.data?.message || "Gönderim sırasında hata oluştu.";
@@ -64,11 +82,6 @@ const TaskDetailModal = ({ task, isOpen, onClose, onUpdate }) => {
             setLoading(false);
         }
     };
-
-    // --- DURUM KONTROLLERİ ---
-    const isAvailable = !task.claimedByMe && !task.submittedByMe;
-    const isActive = task.claimedByMe && !task.submittedByMe;
-    const isSubmitted = task.submittedByMe;
 
     // Renk Yardımcısı
     const getDifficultyColor = (diff) => {
@@ -171,7 +184,7 @@ const TaskDetailModal = ({ task, isOpen, onClose, onUpdate }) => {
                                         <div>
                                             <h4 className="font-bold text-amber-800 dark:text-amber-400">Görevi almaya hazır mısın?</h4>
                                             <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
-                                                "Görevi Al" butonuna bastığında bu görev senin listene eklenecek ve diğer adaylara kapanmayacak (Multi-Junior Mode).
+                                                "Görevi Al" butonuna bastığında bu görev senin listene eklenecek ve hemen çözümünü yüklemeye başlayabileceksin.
                                             </p>
                                         </div>
                                     </div>
@@ -179,7 +192,7 @@ const TaskDetailModal = ({ task, isOpen, onClose, onUpdate }) => {
 
                                 {/* DURUM 2: GÖREV ALINMIŞ, TESLİM BEKLİYOR (ACTIVE) */}
                                 {isActive && (
-                                    <div className="bg-slate-50 dark:bg-slate-800/80 p-5 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm">
+                                    <div className="bg-slate-50 dark:bg-slate-800/80 p-5 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500">
                                         <h3 className="font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2 pb-3 border-b border-gray-200 dark:border-slate-700">
                                             <Send size={18} className="text-blue-500"/>
                                             Çözümünü Gönder
@@ -187,7 +200,7 @@ const TaskDetailModal = ({ task, isOpen, onClose, onUpdate }) => {
                                         <form onSubmit={handleSubmitTask} className="space-y-4">
                                             {/* Github Link Input */}
                                             <div>
-                                                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1.5 uppercase">Proje Linki (GitHub/GitLab)</label>
+                                                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1.5 uppercase">Proje Linki (GitHub/GitLab) *</label>
                                                 <div className="relative group">
                                                     <Github className="absolute left-3 top-3 text-gray-400 group-focus-within:text-blue-500 transition-colors" size={18} />
                                                     <input
@@ -218,7 +231,7 @@ const TaskDetailModal = ({ task, isOpen, onClose, onUpdate }) => {
 
                                 {/* DURUM 3: GÖREV TESLİM EDİLMİŞ (SUBMITTED) */}
                                 {isSubmitted && (
-                                    <div className="bg-green-50 dark:bg-green-900/20 p-8 rounded-xl border border-green-100 dark:border-green-800 text-center flex flex-col items-center justify-center">
+                                    <div className="bg-green-50 dark:bg-green-900/20 p-8 rounded-xl border border-green-100 dark:border-green-800 text-center flex flex-col items-center justify-center animate-in zoom-in duration-300">
                                         <div className="w-16 h-16 bg-green-100 dark:bg-green-800 rounded-full flex items-center justify-center mb-4 shadow-sm animate-bounce-slow">
                                             <CheckCircle2 size={32} className="text-green-600 dark:text-green-400" />
                                         </div>
@@ -259,6 +272,18 @@ const TaskDetailModal = ({ task, isOpen, onClose, onUpdate }) => {
                                             {loading ? <Loader2 className="animate-spin" size={20} /> : 'Gönderimi Tamamla'}
                                         </button>
                                     )}
+                                </div>
+                            )}
+
+                            {/* FOOTER - SADECE KAPAT (SUBMITTED DURUMUNDA) */}
+                            {isSubmitted && (
+                                <div className="p-6 border-t border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-800/50 flex justify-center">
+                                    <button
+                                        onClick={onClose}
+                                        className="px-8 py-2.5 rounded-xl font-bold text-white bg-gray-900 dark:bg-slate-700 hover:bg-gray-800 dark:hover:bg-slate-600 transition-colors shadow-lg"
+                                    >
+                                        Penceryi Kapat
+                                    </button>
                                 </div>
                             )}
                         </motion.div>
