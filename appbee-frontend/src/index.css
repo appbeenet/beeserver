@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+    font-family: 'Inter', sans-serif; /* Daha modern bir font varsayımı */
+    /* Eğer custom-cursor.png dosyan varsa, burayı kullan */
+    /* cursor: url('/custom-cursor.png') 16 16, auto; */ /* 16 16 imleç noktasının koordinatları */
+    cursor: pointer; /* Şimdilik pointer, custom cursoru kendin eklersin */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar Stilleri */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f0f4f8; /* Arka planın rengine yakın */
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1; /* Hafif gri */
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8; /* Daha koyu gri */
+}
+
+/* Blob animasyonları */
+@keyframes blob {
+    0% {
+        transform: translate(0px, 0px) scale(1);
+    }
+    33% {
+        transform: translate(30px, -50px) scale(1.1);
+    }
+    66% {
+        transform: translate(-20px, 20px) scale(0.9);
+    }
+    100% {
+        transform: translate(0px, 0px) scale(1);
+    }
+}
+
+.animate-blob {
+    animation: blob 7s infinite cubic-bezier(0.6, -0.05, 0.735, 0.045);
+}
+
+.animation-delay-2000 {
+    animation-delay: 2s;
+}
+
+.animation-delay-4000 {
+    animation-delay: 4s;
+}
+/* src/index.css dosyasının en altına ekle */
+
+@layer base {
+    html, body, a, button, input, select, textarea, div {
+        cursor: none !important; /* Varsayılan fareyi her yerde gizle */
+    }
+}
+
+/* Mobilde dokunmatik olduğu için cursor gizlemeye gerek yok, hatta sorun çıkarabilir */
+@media (hover: none) and (pointer: coarse) {
+    html, body, a, button, input, select, textarea {
+        cursor: auto !important;
+    }
+}

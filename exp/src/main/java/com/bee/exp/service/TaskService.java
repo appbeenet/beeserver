@@ -35,13 +35,13 @@ public class TaskService {
         if (currentUser == null) {
             throw new RuntimeException("Unauthenticated");
         }
-    
+
         // 1) Açık görevler
         List<Task> openTasks = new ArrayList<>(taskRepository.findByStatus(TaskStatus.PUBLISHED));
-    
+
         // 2) Bu junior'un submission'ları
         List<TaskSubmission> mySubs = taskSubmissionRepository.findByEngineer(currentUser);
-    
+
         // 3) Tekilleştirerek görev listesini birleştir
         Set<Long> seenIds = new HashSet<>();
         for (Task t : openTasks) {
@@ -49,7 +49,7 @@ public class TaskService {
                 seenIds.add(t.getId());
             }
         }
-    
+
         for (TaskSubmission sub : mySubs) {
             Task t = sub.getTask();
             if (t != null && t.getId() != null && !seenIds.contains(t.getId())) {
@@ -57,7 +57,7 @@ public class TaskService {
                 seenIds.add(t.getId());
             }
         }
-    
+
         return openTasks;
     }
     
@@ -70,13 +70,26 @@ public class TaskService {
             throw new RuntimeException("Unauthenticated");
         }
 
-        return companyRepository.findByOwner(currentUser)
+        // 1. Görevleri çek
+        List<Task> tasks = companyRepository.findByOwner(currentUser)
                 .map(taskRepository::findByCompany)
-                .orElse(List.of());
-    }
+                .orElse(new ArrayList<>()); // ArrayList döndür ki üzerinde değişiklik yapabilelim
 
-    public List<Task> listPublishedTasks() {
-        return taskRepository.findByStatus(TaskStatus.PUBLISHED);
+        // --- MİNİMAL DOKUNUŞ ---
+        // Eğer Task tablosunda 'assignedTo' boşsa, gidip Submission tablosundan bulup içine koyuyoruz.
+        tasks.forEach(task -> {
+            if (task.getAssignedTo() == null) {
+                // Submission tablosunda bu göreve ait bir kayıt var mı?
+                List<TaskSubmission> subs = taskSubmissionRepository.findByTask(task);
+                if (!subs.isEmpty()) {
+                    // Varsa ilk mühendisi alıp Task objesine geçici olarak set et
+                    task.setAssignedTo(subs.get(0).getEngineer());
+                }
+            }
+        });
+        // -----------------------
+
+        return tasks;
     }
 
     /**
@@ -119,35 +132,34 @@ public class TaskService {
      * - Sadece TaskSubmission ile (task, engineer) ilişkisini kuruyoruz.
      */
     public Task claimTask(Long taskId, User currentUser) {
-        // 🔴 GEÇİCİ OLARAK currentUser zorunluluğunu kaldırıyoruz
         if (currentUser == null) {
-            // Burada şimdilik exception atma, sadece log yaz:
-            System.out.println("[WARN] claimTask: currentUser is null, demo modunda çalışıyor.");
-            // İleride JWT / Security bağlandığında burayı tekrar sıkılaştıracağız.
+            System.out.println("[WARN] claimTask: currentUser is null");
         }
-    
+
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new RuntimeException("Task not found"));
-    
-        // status / assignedTo kontrolü YOK (multi-junior model)
-        // Sadece TaskSubmission oluşturuyoruz
-    
+
         if (currentUser != null) {
+            // 1. Submission (Başvuru) Kaydı Oluştur
             taskSubmissionRepository.findByTaskAndEngineer(task, currentUser)
                     .orElseGet(() -> {
-                        TaskSubmission s = TaskSubmission.builder()
-                                .task(task)
-                                .engineer(currentUser)
-                                .notes(null)
-                                .attachmentUrl(null)
-                                .build();
+                        TaskSubmission s = new TaskSubmission();
+                        s.setTask(task);
+                        s.setEngineer(currentUser);
                         return taskSubmissionRepository.save(s);
                     });
+
+            // 2. Task Tablosunu Güncelle (Statü: CLAIMED)
+            task.setAssignedTo(currentUser);     // Kişiyi buraya da yaz
+            task.setStatus(TaskStatus.CLAIMED);  // Statüyü CLAIMED yap
+            return taskRepository.save(task);
         }
-    
-        // Task üzerinde herhangi bir değişiklik yok
+
         return task;
     }
+
+
+
 
     /**
      * JUNIOR:
@@ -207,5 +219,10 @@ public class TaskService {
 
     public Task completeTask(Long taskId, User currentUser) {
         return approveTask(taskId, currentUser);
+    }
+
+    public List<Task> listPublishedTasks() {
+        // Sadece statüsü PUBLISHED olan (henüz alınmamış) görevleri döner
+        return taskRepository.findByStatus(TaskStatus.PUBLISHED);
     }
 }
