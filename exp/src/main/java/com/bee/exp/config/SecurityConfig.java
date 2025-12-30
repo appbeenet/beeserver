@@ -27,31 +27,38 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // statik ve giriş sayfası
+                        // statik ve landing
                         .requestMatchers("/", "/index.html", "/static/**", "/css/**", "/js/**", "/images/**")
                             .permitAll()
 
-                        // auth endpoint'leri public
+                        // auth herkese açık
                         .requestMatchers("/api/auth/**")
                             .permitAll()
 
-                        // görevleri listeleme public (landing için)
+                        // task list (landing için public GET)
                         .requestMatchers(HttpMethod.GET, "/api/tasks/**")
                             .permitAll()
 
-                        // junior’ın görev alma / submit etme kısmı -> login gerekli
+                        // task list (landing için public GET)
+                        .requestMatchers(HttpMethod.GET, "/api/leader/**")
+                            .permitAll()
+
+                        // profil: sadece login olması yeter
+                        .requestMatchers("/api/profiles/**")
+                            .authenticated()
+
+                        // task create / claim / submit vs → login gerekli
                         .requestMatchers(HttpMethod.POST, "/api/tasks/**")
                             .authenticated()
 
-                        // firma / mentor için submissions
+                        // submissions: sadece COMPANY veya MENTOR
                         .requestMatchers("/api/submissions/**")
                             .hasAnyRole("COMPANY", "MENTOR")
 
-                        // profil / diğer her şey -> login gerekli
+                        // geri kalan her şey → login
                         .anyRequest()
                             .authenticated()
                 )
-                // 🔐 JWT filtresini UsernamePasswordAuthenticationFilter'dan önce ekle
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
