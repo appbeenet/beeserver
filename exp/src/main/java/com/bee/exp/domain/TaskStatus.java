@@ -5,5 +5,5 @@ public enum TaskStatus {
     CLAIMED,
     SUBMITTED,
     COMPLETED, 
-    APPROVED
+    APPROVED, CANCELLED
 }

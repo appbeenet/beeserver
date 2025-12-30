@@ -1,9 +1,10 @@
 package com.bee.exp.service;
 
-import com.bee.exp.domain.Profile;
-import com.bee.exp.domain.Task;
+import com.bee.exp.domain.TaskDifficulty;
 import com.bee.exp.domain.User;
+import com.bee.exp.domain.Profile;
 import com.bee.exp.repository.ProfileRepository;
+import com.bee.exp.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -12,63 +13,54 @@ import org.springframework.stereotype.Service;
 public class XpService {
 
     private final ProfileRepository profileRepository;
+    private final UserRepository userRepository;
 
     /**
-     * Bir task tamamlandığında junior'a XP yazar.
-     * Formülü burada merkezi tutuyoruz.
+     * Task zorluğuna göre XP geri döner.
+     * İstersen burada difficulty -> XP dönüşüm tablosu yapabilirsin.
      */
-    public void addXpForTaskCompletion(User junior, Task task) {
-        if (junior == null || task == null) return;
+    public int xpForDifficulty(TaskDifficulty diff) {
+        if (diff == null) return 50;
 
-        Profile profile = profileRepository.findByUser(junior)
-                .orElseGet(() -> createProfileForUser(junior));
+        return switch (diff) {
+            case EASY   -> 50;
+            case MEDIUM -> 100;
+            case HARD   -> 200;
+            default     -> 50;
+        };
+    }
 
-        int currentXp = profile.getXpPoints() != null ? profile.getXpPoints() : 0;
+    /**
+     * Junior’a XP kazandırır. Profile + User.xp kolonlarını günceller
+     */
+    public void grantXp(User user, int xp) {
+        if (xp <= 0) return;
 
-        // Basit formül: bounty + (difficulty * 10)
-        Integer bounty = task.getPrice(); // ileride bountyAmount'a geçersin
-        if (bounty == null) bounty = 0;
+        // --- Profile XP güncelle ---
+        Profile profile = profileRepository.findByUser(user)
+                .orElseThrow(() -> new RuntimeException("No profile for user id = " + user.getId()));
 
-        int difficultyBonus = 0;
-        if (task.getDifficulty() != null) {
-            // EASY / MEDIUM / HARD → puanlama istersen enum ordinal / ayrı mapping ile
-            switch (task.getDifficulty()) {
-                case EASY -> difficultyBonus = 5;
-                case MEDIUM -> difficultyBonus = 10;
-                case HARD -> difficultyBonus = 20;
-                default -> difficultyBonus = 0;
-            }
-        }
-
-        int gained = bounty + difficultyBonus;
-        int newXp = currentXp + gained;
-
+        int newXp = profile.getXpPoints() + xp;
         profile.setXpPoints(newXp);
+
+        // İstersen Level hesaplama ekleyebilirsin:
         profile.setLevel(calculateLevel(newXp));
 
         profileRepository.save(profile);
-    }
 
-    private Profile createProfileForUser(User user) {
-        Profile p = Profile.builder()
-                .user(user)
-                .xpPoints(0)
-                .level(1)
-                .honeyDrops(0)
-                .githubHandle(null)
-                .reputationScore(0.0)
-                .build();
-        return profileRepository.save(p);
+        // --- User tablosunda da tutuyorsan güncelle (senin modelinde xp var) ---
+        user.setXp(user.getXp() + xp);
+        userRepository.save(user);
+
+        System.out.println("XP granted: +" + xp + " -> user " + user.getEmail());
     }
 
     /**
-     * Basit seviye hesaplama:
-     * 0-99 → Level 1,
-     * 100-199 → Level 2,
-     * ...
+     * Basit level formülü:
+     * her 500 xp’de 1 level
+     * (İstersen sonra logaritmik / quadratic progression yaparız)
      */
     private int calculateLevel(int xp) {
-        int base = xp / 100;
-        return Math.max(1, base + 1);
+        return Math.max(1, xp / 500 + 1);
     }
 }

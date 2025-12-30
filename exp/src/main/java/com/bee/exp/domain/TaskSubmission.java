@@ -9,23 +9,19 @@ import java.time.Instant;
 @Table(name = "task_submissions")
 @Getter
 @Setter
-@Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class TaskSubmission {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Hangi task için submission
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "task_id")
+    @ManyToOne(optional = false)
     private Task task;
 
-    // Junior / Engineer
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "engineer_id")
+    @ManyToOne(optional = false)
     private User engineer;
 
     @Column(length = 4000)
@@ -33,16 +29,41 @@ public class TaskSubmission {
 
     private String attachmentUrl;
 
-    private Instant createdAt;
+    /**
+     * Junior’ın submit ettiği zaman.
+     * Claim aşamasında da kayıt açarsak, ilk persist’te dolacak.
+     */
+    private Instant submittedAt;
 
-    // Onay durumu
-    private Boolean approved;
+    /**
+     * Firma / mentor review süreci için status
+     *  - PENDING: Submit edilmiş, onay bekliyor
+     *  - APPROVED: Onaylandı, XP verildi
+     *  - REJECTED: Reddedildi (ileride kullanabiliriz)
+     */
+    @Enumerated(EnumType.STRING)
+    private SubmissionStatus status;
 
+    /**
+     * Onay bilgileri
+     */
     private Instant approvedAt;
 
+    @ManyToOne
+    private User approvedBy;
+
+    /**
+     * Bu submission için verilen XP (onayda hesaplanır)
+     */
+    private Integer xpAwarded;
+
     @PrePersist
-    public void onCreate() {
-        if (createdAt == null) createdAt = Instant.now();
-        if (approved == null) approved = false;
+    public void prePersist() {
+        if (submittedAt == null) {
+            submittedAt = Instant.now();
+        }
+        if (status == null) {
+            status = SubmissionStatus.PENDING;
+        }
     }
 }

@@ -267,6 +267,20 @@
 
             <p id="taskCreateMsg" class="text-xs mt-2 hidden"></p>
           </form>
+
+          <!-- Firma / Mentor: Pending Submissions Listesi -->
+          <div id="companySubmissions" class="mt-6 hidden">
+            <div class="flex items-center justify-between mb-3">
+              <h2 class="text-lg font-semibold">Onay Bekleyen Görevler</h2>
+              <span id="submissionCount" class="text-xs text-slate-400">0 kayıt</span>
+            </div>
+            <div id="submissionList" class="space-y-2 text-sm">
+              <p class="text-xs text-slate-400">
+                Junior’ların submit ettiği görevler burada listelenecek. Onayladığınızda ilgili junior XP kazanacak.
+              </p>
+            </div>
+            <p id="submissionError" class="text-xs text-red-400 mt-3 hidden"></p>
+          </div>
         </section>
 
       </div>
@@ -320,6 +334,11 @@
     const taskDifficulty = document.getElementById("taskDifficulty");
     const taskPrice = document.getElementById("taskPrice");
 
+    const companySubmissions = document.getElementById("companySubmissions");
+    const submissionList = document.getElementById("submissionList");
+    const submissionError = document.getElementById("submissionError");
+    const submissionCount = document.getElementById("submissionCount");
+
     function buildCurrentUserFromLogin(data, emailFromForm) {
       return {
         id: data.userId,
@@ -348,9 +367,13 @@
       if (isCompanyLoggedIn()) {
         if (companyInfo) companyInfo.classList.add("hidden");
         if (taskCreateForm) taskCreateForm.classList.remove("hidden");
+        if (companySubmissions) companySubmissions.classList.remove("hidden");
+        // Firma/mentor login ise pending submission’ları yükle
+        loadPendingSubmissions();
       } else {
         if (companyInfo) companyInfo.classList.remove("hidden");
         if (taskCreateForm) taskCreateForm.classList.add("hidden");
+        if (companySubmissions) companySubmissions.classList.add("hidden");
       }
     }
 
@@ -463,7 +486,6 @@
         }
       } catch (err) {
         console.warn("Profil yüklenirken hata:", err);
-        // Hata durumunda ekranı resetlemeden sadece log basalım
       }
     }
 
@@ -567,7 +589,7 @@
           if (authCard) authCard.classList.add("hidden");
           showEngineerPanel();
 
-          // 👉 Yeni: Girişte profil + görevleri yükle
+          // 👉 Girişte profil + görevleri yükle
           await loadProfile();
           await loadTasks();
         } else {
@@ -645,7 +667,6 @@
 
           if (isEngineer) {
             if (!claimedByMe) {
-              // Henüz almamış → Görevi Al
               actionHtml = `
                 <button
                   class="text-xs px-3 py-1 rounded-full border border-yellow-400 text-yellow-300 hover:bg-yellow-400 hover:text-slate-900 transition"
@@ -654,7 +675,6 @@
                   Görevi Al
                 </button>`;
             } else if (claimedByMe && !submittedByMe) {
-              // Almış ama submit etmemiş → Submit
               actionHtml = `
                 <button
                   class="text-xs px-3 py-1 rounded-full border border-emerald-400 text-emerald-300 hover:bg-emerald-400 hover:text-slate-900 transition"
@@ -663,7 +683,6 @@
                   Submit (Çözüm Gönder)
                 </button>`;
             } else if (submittedByMe) {
-              // Submit etmiş → etiket
               actionHtml = `
                 <span class="text-[10px] px-2 py-1 rounded-full border border-emerald-400 text-emerald-300">
                   Submit edildi • Onay bekliyor
@@ -772,7 +791,6 @@
         }
 
         alert("Görev başarıyla submit edildi. Mentor / firma onayından sonra XP kazanacaksın.");
-        // Submit sonrası XP’yi de güncelle
         await loadProfile();
         await loadTasks();
       } catch (err) {
@@ -854,6 +872,142 @@
       });
     }
 
+    // Firma / Mentor: pending submissions yükleme
+    async function loadPendingSubmissions() {
+      if (!isCompanyLoggedIn()) {
+        if (submissionList) {
+          submissionList.innerHTML = '<p class="text-xs text-slate-400">Firma olarak giriş yaptıktan sonra submit edilen görevleri burada görebilirsiniz.</p>';
+        }
+        if (submissionCount) submissionCount.textContent = "0 kayıt";
+        return;
+      }
+
+      submissionError.classList.add("hidden");
+      if (submissionList) {
+        submissionList.innerHTML = '<p class="text-xs text-slate-400">Onay bekleyen görevler yükleniyor...</p>';
+      }
+
+      try {
+        const res = await fetch(API_BASE + "/api/submissions/pending", {
+          headers: {
+            "Authorization": "Bearer " + authToken
+          }
+        });
+
+        if (!res.ok) {
+          throw new Error("Onay bekleyen görevler yüklenemedi.");
+        }
+
+        const submissions = await res.json();
+        if (submissionCount) submissionCount.textContent = submissions.length + " kayıt";
+
+        if (!submissions.length) {
+          if (submissionList) {
+            submissionList.innerHTML = '<p class="text-xs text-slate-400">Şu anda onay bekleyen görev bulunmuyor.</p>';
+          }
+          return;
+        }
+
+        submissionList.innerHTML = "";
+        submissions.forEach((s) => {
+          const div = document.createElement("div");
+          div.className = "bg-slate-950/60 border border-slate-800 rounded-xl px-3 py-2";
+
+          const taskTitle = s.taskTitle || "Görev";
+          const engineerName = s.engineerName || "Junior";
+          const engineerEmail = s.engineerEmail || "";
+          const notes = s.notes || "";
+          const attachmentUrl = s.attachmentUrl || "";
+          const status = s.status || "PENDING";
+
+          let attachmentHtml = "";
+          if (attachmentUrl) {
+            attachmentHtml = `
+              <p class="text-[11px] text-slate-400 mt-1">
+                Link: <a href="${attachmentUrl}" target="_blank" class="underline text-sky-300 break-all">${attachmentUrl}</a>
+              </p>`;
+          }
+
+          const canApprove = status === "PENDING";
+
+          div.innerHTML = `
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <p class="font-medium text-sm">${taskTitle}</p>
+                <p class="text-[11px] text-slate-400">
+                  Junior: <span class="text-slate-100">${engineerName}</span>
+                  ${engineerEmail ? ' • <span class="text-slate-300">' + engineerEmail + '</span>' : ""}
+                </p>
+                <p class="text-[11px] text-slate-300 mt-1">
+                  Notlar: ${notes || "<span class='text-slate-500'>—</span>"}
+                </p>
+                ${attachmentHtml}
+                <p class="text-[11px] text-slate-500 mt-1">
+                  Durum: <span class="text-slate-100">${status}</span>
+                  ${s.xpAwarded ? ' • XP: <span class="text-emerald-300">' + s.xpAwarded + '</span>' : ""}
+                </p>
+              </div>
+              <div class="flex flex-col items-end gap-1 ml-2">
+                ${
+                  canApprove
+                    ? `<button
+                        class="text-[11px] px-3 py-1 rounded-full border border-emerald-400 text-emerald-300 hover:bg-emerald-400 hover:text-slate-900 transition"
+                        onclick="approveSubmission('${s.id}')"
+                       >
+                        Onayla
+                       </button>`
+                    : `<span class="text-[10px] px-2 py-1 rounded-full border border-emerald-400 text-emerald-300">
+                        Onaylanmış
+                       </span>`
+                }
+              </div>
+            </div>
+          `;
+          submissionList.appendChild(div);
+        });
+      } catch (err) {
+        console.error(err);
+        submissionError.textContent = err.message || "Onay bekleyen görevler alınırken hata oluştu.";
+        submissionError.classList.remove("hidden");
+      }
+    }
+
+    // Firma / Mentor: Submission onayla
+    async function approveSubmission(submissionId) {
+      if (!isCompanyLoggedIn()) {
+        alert("Görev onaylamak için firma / mentor olarak giriş yapmalısınız.");
+        return;
+      }
+
+      if (!confirm("Bu submission'ı onaylamak istediğinizden emin misiniz? Junior bu görev için XP kazanacak.")) {
+        return;
+      }
+
+      try {
+        const res = await fetch(API_BASE + "/api/submissions/" + submissionId + "/approve", {
+          method: "POST",
+          headers: {
+            "Authorization": "Bearer " + authToken
+          }
+        });
+
+        if (!res.ok) {
+          let msg = "Submission onaylanamadı.";
+          try {
+            const errData = await res.json();
+            if (errData && errData.message) msg = errData.message;
+          } catch (_) {}
+          throw new Error(msg);
+        }
+
+        alert("Görev onaylandı. İlgili junior XP kazanmış durumda.");
+        await loadPendingSubmissions();
+      } catch (err) {
+        console.error(err);
+        alert(err.message || "Onaylama sırasında bir hata oluştu.");
+      }
+    }
+
     function logout() {
       authToken = null;
       currentUser = null;
@@ -867,6 +1021,11 @@
       taskCount.textContent = "0 görev";
       totalXp.textContent = "0";
       level.textContent = "—";
+
+      if (submissionList) {
+        submissionList.innerHTML = '<p class="text-xs text-slate-400">Firma olarak giriş yaptıktan sonra submit edilen görevleri burada görebilirsiniz.</p>';
+      }
+      if (submissionCount) submissionCount.textContent = "0 kayıt";
 
       authForm.reset();
       switchAppMode("engineer");
