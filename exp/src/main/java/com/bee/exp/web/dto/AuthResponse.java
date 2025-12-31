@@ -1,12 +1,12 @@
 package com.bee.exp.web.dto;
 
-import com.bee.exp.domain.Role;
+import com.bee.exp.domain.UserRole;
 import lombok.Data;
 
 @Data
 public class AuthResponse {
-    private String token;
     private Long userId;
-    private Role role;
+    private String token;
+    private UserRole role;        // 🔹 BURADA UserRole
     private String fullName;
 }

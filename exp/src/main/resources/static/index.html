@@ -438,6 +438,35 @@
     switchAppMode("engineer");
     switchAuthMode("login");
 
+    // 👉 Profil (XP & Level) yükleme
+    async function loadProfile() {
+      if (!authToken) return;
+      try {
+        const res = await fetch(API_BASE + "/api/profiles/me", {
+          headers: {
+            "Authorization": "Bearer " + authToken
+          }
+        });
+        if (!res.ok) {
+          throw new Error("Profil bilgileri alınamadı.");
+        }
+        const p = await res.json();
+        if (typeof p.xpPoints === "number") {
+          totalXp.textContent = p.xpPoints;
+        } else {
+          totalXp.textContent = "0";
+        }
+        if (typeof p.level === "number") {
+          level.textContent = p.level;
+        } else {
+          level.textContent = "—";
+        }
+      } catch (err) {
+        console.warn("Profil yüklenirken hata:", err);
+        // Hata durumunda ekranı resetlemeden sadece log basalım
+      }
+    }
+
     authForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       authError.classList.add("hidden");
@@ -537,6 +566,9 @@
 
           if (authCard) authCard.classList.add("hidden");
           showEngineerPanel();
+
+          // 👉 Yeni: Girişte profil + görevleri yükle
+          await loadProfile();
           await loadTasks();
         } else {
           const body = {
@@ -740,6 +772,8 @@
         }
 
         alert("Görev başarıyla submit edildi. Mentor / firma onayından sonra XP kazanacaksın.");
+        // Submit sonrası XP’yi de güncelle
+        await loadProfile();
         await loadTasks();
       } catch (err) {
         console.error(err);
