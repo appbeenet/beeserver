@@ -12,10 +12,14 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/companies")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 public class CompanyController {
 
     private final CompanyRepository companyRepository;
+
+    @GetMapping
+    public ResponseEntity<java.util.List<Company>> getAllCompanies() {
+        return ResponseEntity.ok(companyRepository.findAll());
+    }
 
     @GetMapping("/me")
     public ResponseEntity<Company> getMyCompany(@AuthenticationPrincipal User currentUser) {

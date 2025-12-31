@@ -24,6 +24,27 @@ const Register = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [passwordStrength, setPasswordStrength] = useState(0);
 
+    // Yeni State: Şirketler listesi ve seçilen şirket ID'si
+    const [companies, setCompanies] = useState([]);
+    const [selectedCompanyId, setSelectedCompanyId] = useState('');
+
+    // Şirketleri backend'den çek
+    useEffect(() => {
+        const fetchCompanies = async () => {
+            try {
+                // Not: Bu endpoint'in public (SecurityConfig'de permitAll) olması lazım
+                const res = await fetch('http://localhost:8080/api/companies');
+                if (res.ok) {
+                    const data = await res.json();
+                    setCompanies(data);
+                }
+            } catch (error) {
+                console.error("Şirket listesi çekilemedi:", error);
+            }
+        };
+        fetchCompanies();
+    }, []);
+
     // Şifre gücü hesaplama
     useEffect(() => {
         const pass = formData.password || '';
@@ -57,6 +78,11 @@ const Register = () => {
 
         // confirmPassword'ü backend'e göndermeye gerek yok
         const { confirmPassword, ...dataToSend } = formData;
+
+        // Eğer Firma rolü seçildiyse companyId'yi ekle
+        if (formData.role === 'COMPANY' && selectedCompanyId) {
+            dataToSend.companyId = parseInt(selectedCompanyId);
+        }
 
         // Register fonksiyonunu çağır (AuthContext içindeki)
         const result = await register(dataToSend);
@@ -148,6 +174,34 @@ const Register = () => {
                                 </div>
                             </div>
                         </div>
+
+                        {/* ŞİRKET SEÇİMİ DROPDOWN (Sadece COMPANY rolü seçiliyse görünür) */}
+                        {formData.role === 'COMPANY' && (
+                            <motion.div 
+                                initial={{ opacity: 0, y: -10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="relative group"
+                            >
+                                <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 block">Şirket Seçiniz</label>
+                                <select
+                                    value={selectedCompanyId}
+                                    onChange={(e) => setSelectedCompanyId(e.target.value)}
+                                    className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition text-gray-900 dark:text-white"
+                                    required
+                                >
+                                    <option value="" disabled>Listeden bir şirket seçin...</option>
+                                    {companies.map((comp) => (
+                                        <option key={comp.id} value={comp.id}>
+                                            {comp.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    *Listede şirketiniz yoksa lütfen yönetici ile iletişime geçin.
+                                </p>
+                            </motion.div>
+                        )}
+
 
                         <div className="space-y-4">
                             {/* AD SOYAD INPUT (DÜZELTİLDİ: name='name') */}

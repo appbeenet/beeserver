@@ -1,12 +1,16 @@
 package com.bee.exp.config;
 
+import com.bee.exp.security.JwtAuthFilter;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -15,40 +19,45 @@ import java.util.List;
 
 @Configuration
 @EnableWebSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
+
+    private final JwtAuthFilter jwtAuthFilter;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-
         http
-                .csrf(csrf -> csrf.disable()) // CSRF kapatıldı (Frontend için gerekli)
-                .cors(cors -> cors.configurationSource(corsConfigurationSource())) // <-- BU SATIR ÇOK ÖNEMLİ (CORS'u aktif ettik)
+                .csrf(AbstractHttpConfigurer::disable) // CSRF disabled for stateless JWT
+                .cors(cors -> cors.configurationSource(corsConfigurationSource())) // Enable CORS
                 .authorizeHttpRequests(auth -> auth
-                        // Statik dosyalar, Auth ve Tasks endpoint'lerine izin ver
-                        .requestMatchers("/", "/index.html", "/static/**", "/css/**", "/js/**", "/images/**", "/api/auth/**", "/api/tasks/**")
-                        .permitAll()
-                        .anyRequest()
-                        .authenticated()
-                );
+                        // Public endpoints
+                        .requestMatchers("/", "/index.html", "/admin", "/admin.html", "/static/**", "/css/**", "/js/**", "/images/**").permitAll()
+                        .requestMatchers("/api/auth/**").permitAll()
+                        // Allow reading tasks and companies publicly (adjust if needed)
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/tasks/**").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/companies").permitAll()
+                        // Admin specific endpoints
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        // All other requests require authentication
+                        .anyRequest().authenticated()
+                )
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
-    // 🔐 PasswordEncoder (Şifreleme Bean'i)
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    // 🌐 CORS Ayarı (React ile Backend'in konuşması için)
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-
-        // React uygulamanın adresi (Vite kullanıyorsan genelde 5173'tür)
-        // Eğer 3000 kullanıyorsan burayı değiştirebilirsin veya "*" koyarak hepsine izin verebilirsin (Geliştirme için)
+        
+        // Allow frontend origins (Vite default: 5173, React default: 3000)
         configuration.setAllowedOrigins(List.of("http://localhost:5173", "http://localhost:3000"));
-
+        
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);

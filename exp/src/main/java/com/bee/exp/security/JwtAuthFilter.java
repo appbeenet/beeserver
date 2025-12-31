@@ -22,8 +22,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class JwtAuthFilter extends OncePerRequestFilter {
 
-    private final JwtUtil jwtUtil;
     private final UserRepository userRepository;
+    private final JwtUtil jwtUtil;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -36,7 +36,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);
             try {
-                // 👇 Artık Jwts yok, sadece JwtUtil
                 Claims claims = jwtUtil.getClaims(token);
                 Long userId = Long.parseLong(claims.getSubject());
                 String roleName = claims.get("role", String.class);
@@ -50,7 +49,9 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                     );
                     SecurityContextHolder.getContext().setAuthentication(auth);
                 }
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                // Log exclusion to avoid spamming logs for invalid tokens during scanning
+                System.err.println("JWT Validation Error: " + e.getMessage());
             }
         }
 

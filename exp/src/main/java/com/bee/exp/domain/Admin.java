@@ -6,10 +6,10 @@ import lombok.*;
 import java.time.Instant;
 
 @Entity
-@Table(name = "users")
+@Table(name = "admins")
 @Getter @Setter
 @NoArgsConstructor @AllArgsConstructor @Builder
-public class User {
+public class Admin {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -21,23 +21,7 @@ public class User {
     @Column(nullable = false)
     private String passwordHash;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private UserRole role;
-
     private String fullName;
-
-    @Builder.Default
-    private Boolean enabled = true;
-
-    @ManyToOne
-    @JoinColumn(name = "company_id")
-    private Company company;
-
-    @Builder.Default
-    private Integer xp = 0;
-    @Builder.Default
-    private Integer level = 1;
 
     private Instant createdAt;
     private Instant updatedAt;

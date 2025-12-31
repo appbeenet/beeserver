@@ -11,6 +11,9 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
 
     List<Task> findByStatus(TaskStatus status);
 
-    // Firma görevleri
+    // Find tasks by company entity
     List<Task> findByCompany(Company company);
+
+    // Find tasks by company ID (useful if we only have the ID)
+    List<Task> findByCompanyId(Long companyId);
 }

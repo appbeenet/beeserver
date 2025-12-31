@@ -16,7 +16,6 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 public class AuthController {
 
     private final UserService userService;
@@ -31,28 +30,14 @@ public class AuthController {
             return ResponseEntity.badRequest().build();
         }
 
-        // RegisterRequest.role:
-        //  - Eğer DTO'da UserRole ise: direkt req.getRole()
-        //  - Eğer String ise: valueOf ile çevir
-        UserRole roleEnum;
-        Object rawRole = req.getRole();
-
-        if (rawRole instanceof UserRole) {
-            roleEnum = (UserRole) rawRole;
-        } else {
-            // String veya başka bir şey gelirse:
-            try {
-                roleEnum = UserRole.valueOf(rawRole.toString().toUpperCase());
-            } catch (IllegalArgumentException ex) {
-                return ResponseEntity.badRequest().build();
-            }
-        }
+        UserRole roleEnum = req.getRole();
 
         User user = userService.registerUser(
                 req.getEmail(),
                 req.getPassword(),
                 req.getFullName(),
-                roleEnum
+                roleEnum,
+                req.getCompanyId()
         );
 
         String token = jwtUtil.generateToken(user.getId(), roleEnum, user.getEmail());
@@ -60,7 +45,7 @@ public class AuthController {
         AuthResponse resp = new AuthResponse();
         resp.setToken(token);
         resp.setUserId(user.getId());
-        resp.setRole(roleEnum);             // 🔹 UserRole
+        resp.setRole(roleEnum);
         resp.setFullName(user.getFullName());
 
         return ResponseEntity.ok(resp);
@@ -80,7 +65,6 @@ public class AuthController {
             return ResponseEntity.status(401).build();
         }
 
-        // User entity role tipi: UserRole
         UserRole roleEnum = user.getRole();
 
         String token = jwtUtil.generateToken(user.getId(), roleEnum, user.getEmail());
@@ -88,7 +72,7 @@ public class AuthController {
         AuthResponse resp = new AuthResponse();
         resp.setToken(token);
         resp.setUserId(user.getId());
-        resp.setRole(roleEnum);           // 🔹 UserRole
+        resp.setRole(roleEnum);
         resp.setFullName(user.getFullName());
 
         return ResponseEntity.ok(resp);

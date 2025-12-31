@@ -49,6 +49,16 @@ public class TaskService {
         return openTasks;
     }
 
+    public List<Task> listTasksForCompany(User currentUser) {
+         if (currentUser == null) {
+            throw new RuntimeException("Unauthenticated");
+        }
+        Company company = companyRepository.findByOwner(currentUser)
+                .orElseThrow(() -> new RuntimeException("No company found for this user"));
+        
+        return taskRepository.findByCompany(company);
+    }
+
     public Task createTask(Task task, User currentUser) {
         if (currentUser == null) {
             throw new RuntimeException("Unauthenticated");
@@ -66,6 +76,40 @@ public class TaskService {
         task.setUpdatedAt(Instant.now());
 
         return taskRepository.save(task);
+    }
+
+    public Task updateTask(Long taskId, Task taskDetails, User currentUser) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new RuntimeException("Task not found"));
+
+        Company company = companyRepository.findByOwner(currentUser)
+                .orElseThrow(() -> new RuntimeException("No company found for this user"));
+
+        if (!task.getCompany().getId().equals(company.getId())) {
+            throw new RuntimeException("Not authorized to update this task");
+        }
+
+        task.setTitle(taskDetails.getTitle());
+        task.setDescription(taskDetails.getDescription());
+        task.setDifficulty(taskDetails.getDifficulty());
+        task.setPrice(taskDetails.getPrice());
+        task.setUpdatedAt(Instant.now());
+
+        return taskRepository.save(task);
+    }
+
+    public void deleteTask(Long taskId, User currentUser) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new RuntimeException("Task not found"));
+
+        Company company = companyRepository.findByOwner(currentUser)
+                .orElseThrow(() -> new RuntimeException("No company found for this user"));
+
+        if (!task.getCompany().getId().equals(company.getId())) {
+            throw new RuntimeException("Not authorized to delete this task");
+        }
+
+        taskRepository.delete(task);
     }
 
     public Task claimTask(Long taskId, User currentUser) {
@@ -118,13 +162,6 @@ public class TaskService {
         return taskSubmissionRepository.save(submission);
     }
 
-    /**
-     * Mentor/Firma görevi onaylar:
-     *  - Bu task'a ait onaysız submission'ları bul
-     *  - Her bir engineer için XpService üzerinden XP yaz
-     *  - Submission'ları approved=true yap
-     *  - Task.status = COMPLETED
-     */
     public Task approveTask(Long taskId, User currentUser) {
         if (currentUser == null) {
             throw new RuntimeException("Unauthenticated");
@@ -133,7 +170,13 @@ public class TaskService {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new RuntimeException("Task not found"));
 
-        // İstersen burada sadece company owner onaylayabilsin diye check eklersin.
+        // Verify company ownership
+        Company company = companyRepository.findByOwner(currentUser)
+             .orElseThrow(() -> new RuntimeException("No company found for this user"));
+
+        if (!task.getCompany().getId().equals(company.getId())) {
+             throw new RuntimeException("Not authorized to approve this task");
+        }
 
         List<TaskSubmission> submissions = taskSubmissionRepository.findByTask(task);
 
@@ -144,7 +187,7 @@ public class TaskService {
 
             User engineer = sub.getEngineer();
             if (engineer != null) {
-                // ✅ XP'yi merkezi servis üzerinden yaz
+                // ✅ XP logic via centralized service
                 xpService.addXpForTaskCompletion(engineer, task);
             }
 
@@ -156,5 +199,19 @@ public class TaskService {
         task.setStatus(TaskStatus.COMPLETED);
         task.setUpdatedAt(Instant.now());
         return taskRepository.save(task);
+    }
+
+    public List<TaskSubmission> getSubmissionsForTask(Long taskId, User currentUser) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new RuntimeException("Task not found"));
+        
+        Company company = companyRepository.findByOwner(currentUser)
+             .orElseThrow(() -> new RuntimeException("No company found for this user"));
+
+        if (!task.getCompany().getId().equals(company.getId())) {
+             throw new RuntimeException("Not authorized to view submissions for this task");
+        }
+
+        return taskSubmissionRepository.findByTask(task);
     }
 }

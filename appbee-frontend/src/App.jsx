@@ -12,6 +12,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import EngineerDashboard from './pages/EngineerDashboard';
 import CompanyDashboard from './pages/CompanyDashboard';
+import AdminDashboard from './pages/AdminDashboard';
 import TasksPage from './pages/TasksPage';
 import Leaderboard from './pages/Leaderboard'; // 1. EKLEME: Import Et
 import { Loader2 } from 'lucide-react';
@@ -89,6 +90,16 @@ function App() {
                             element={
                                 <ProtectedRoute allowedRoles={['company', 'admin']}>
                                     <CompanyDashboard />
+                                </ProtectedRoute>
+                            }
+                        />
+
+                        {/* --- ADMIN PANELİ --- */}
+                        <Route
+                            path="/admin-dashboard"
+                            element={
+                                <ProtectedRoute allowedRoles={['admin']}>
+                                    <AdminDashboard />
                                 </ProtectedRoute>
                             }
                         />

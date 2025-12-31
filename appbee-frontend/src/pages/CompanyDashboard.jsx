@@ -56,12 +56,10 @@ const CompanyDashboard = () => {
         setLoadingTasks(true);
         try {
             const token = localStorage.getItem('token');
-
             // ✅ Backend zaten COMPANY rolünde /api/tasks çağrısında sadece kendi company görevlerini döndürüyor
             const res = await axios.get('http://localhost:8080/api/tasks', {
                 headers: { Authorization: `Bearer ${token}` },
             });
-
             setTasks(res.data || []);
         } catch (error) {
             console.error(error);

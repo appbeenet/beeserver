@@ -67,6 +67,12 @@ const Navbar = () => {
                         <Trophy size={18} /> Liderlik Tablosu
                     </Link>
 
+                    {user && (user.role === 'ADMIN' || user.role === 'admin') && (
+                        <Link to="/admin-dashboard" className="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors flex items-center gap-1">
+                            <Briefcase size={18} /> Admin
+                        </Link>
+                    )}
+
                     {user && (
                         <Link to={getDashboardLink()} className="flex items-center gap-2 text-blue-600 dark:text-blue-400 font-semibold hover:opacity-80 transition-opacity">
                             <LayoutDashboard size={18} />
@@ -136,6 +142,12 @@ const Navbar = () => {
                         <Link to="/leaderboard" className="text-gray-600 dark:text-gray-300 font-medium flex items-center gap-2" onClick={() => setIsOpen(false)}>
                             <Trophy size={18} /> Liderlik Tablosu
                         </Link>
+
+                        {user && (user.role === 'ADMIN' || user.role === 'admin') && (
+                             <Link to="/admin-dashboard" className="text-gray-600 dark:text-gray-300 font-medium flex items-center gap-2" onClick={() => setIsOpen(false)}>
+                                <Briefcase size={18} /> Admin
+                            </Link>
+                        )}
 
                         {user && (
                             <Link to={getDashboardLink()} className="text-blue-600 dark:text-blue-400 font-medium flex items-center gap-2" onClick={() => setIsOpen(false)}>

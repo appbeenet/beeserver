@@ -23,25 +23,27 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/tasks")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 public class TaskController {
 
     private final TaskService taskService;
     private final TaskSubmissionRepository taskSubmissionRepository;
     private final UserRepository userRepository;
 
-    // --- Kullanıcı Çözümleme Yardımcısı ---
+    // --- User Resolution Helper ---
     private User resolveUser(Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated()) {
-            throw new RuntimeException("Oturum açılmamış (Unauthenticated).");
+            throw new RuntimeException("Unauthenticated.");
         }
 
         Object principal = authentication.getPrincipal();
-        String email;
-
+        
         if (principal instanceof User) {
-            email = ((User) principal).getEmail();
-        } else if (principal instanceof UserDetails) {
+            return (User) principal;
+        }
+        
+        // Fallback for other principal types (should not happen with current JwtAuthFilter)
+        String email;
+        if (principal instanceof UserDetails) {
             email = ((UserDetails) principal).getUsername();
         } else if (principal instanceof String) {
             email = (String) principal;
@@ -51,9 +53,8 @@ public class TaskController {
             email = principal.toString();
         }
 
-        String finalEmail = email;
-        return userRepository.findByEmail(finalEmail)
-                .orElseThrow(() -> new RuntimeException("Kullanıcı veritabanında bulunamadı: " + finalEmail));
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found: " + email));
     }
 
     @GetMapping("/ping")
@@ -61,7 +62,7 @@ public class TaskController {
         return "ok";
     }
 
-    // 1. Görevleri Listele
+    // 1. List Tasks
     @GetMapping
     public List<TaskResponse> list(
             Authentication authentication,
@@ -84,7 +85,7 @@ public class TaskController {
                 .toList();
     }
 
-    // 2. Görev Oluştur
+    // 2. Create Task
     @PostMapping
     public ResponseEntity<TaskResponse> create(
             Authentication authentication,
@@ -100,10 +101,39 @@ public class TaskController {
                 .build();
 
         Task saved = taskService.createTask(task, currentUser);
-        return ResponseEntity.ok(toResponse(saved));
+        return ResponseEntity.ok(toResponse(saved, currentUser));
     }
 
-    // 3. Görevi Sahiplen (Claim)
+    // Update Task (merged from stash)
+    @PutMapping("/{id}")
+    public ResponseEntity<TaskResponse> update(
+            @PathVariable Long id,
+            Authentication authentication,
+            @RequestBody TaskCreateRequest req
+    ) {
+        User currentUser = resolveUser(authentication);
+        Task taskDetails = Task.builder()
+                .title(req.getTitle())
+                .description(req.getDescription())
+                .difficulty(req.getDifficulty())
+                .price(req.getPrice())
+                .build();
+        Task updated = taskService.updateTask(id, taskDetails, currentUser);
+        return ResponseEntity.ok(toResponse(updated, currentUser));
+    }
+
+    // Delete Task (merged from stash)
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(
+            @PathVariable Long id,
+            Authentication authentication
+    ) {
+        User currentUser = resolveUser(authentication);
+        taskService.deleteTask(id, currentUser);
+        return ResponseEntity.noContent().build();
+    }
+
+    // 3. Claim Task
     @PostMapping("/{id}/claim")
     public ResponseEntity<TaskResponse> claim(
             @PathVariable("id") Long id,
@@ -111,10 +141,10 @@ public class TaskController {
     ) {
         User currentUser = resolveUser(authentication);
         Task t = taskService.claimTask(id, currentUser);
-        return ResponseEntity.ok(toResponse(t));
+        return ResponseEntity.ok(toResponse(t, currentUser));
     }
 
-    // 4. Görevi Teslim Et (Submit)
+    // 4. Submit Task
     @PostMapping("/{id}/submit")
     public ResponseEntity<Long> submit(
             @PathVariable("id") Long id,
@@ -126,7 +156,7 @@ public class TaskController {
         return ResponseEntity.ok(s.getId());
     }
 
-    // 5. Görevi Onayla (Approve)
+    // 5. Approve Task
     @PostMapping("/{id}/approve")
     public ResponseEntity<TaskResponse> approve(
             @PathVariable("id") Long id,
@@ -134,18 +164,16 @@ public class TaskController {
     ) {
         User currentUser = resolveUser(authentication);
         Task t = taskService.approveTask(id, currentUser);
-        return ResponseEntity.ok(toResponse(t));
+        return ResponseEntity.ok(toResponse(t, currentUser));
     }
 
-    // 6. Başvuruları Getir (Get Submissions) - EKSİK OLAN KISIM BUYDU
+    // 6. Get Submissions
     @GetMapping("/{id}/submissions")
     public ResponseEntity<List<TaskSubmission>> getSubmissions(
             @PathVariable("id") Long id,
             Authentication authentication
     ) {
         User currentUser = resolveUser(authentication);
-        // Bu metodu TaskService içinde tanımlamış olman gerekiyor.
-        // Eğer TaskService'de yoksa hata verir.
         List<TaskSubmission> submissions = taskService.getSubmissionsForTask(id, currentUser);
         return ResponseEntity.ok(submissions);
     }

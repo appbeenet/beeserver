@@ -3,43 +3,41 @@ package com.bee.exp.security;
 import com.bee.exp.domain.UserRole;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.security.Keys;
 import org.springframework.stereotype.Component;
-import java.nio.charset.StandardCharsets;
 
+import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
 @Component
 public class JwtUtil {
 
-    private static final byte[] SECRET =
-    "this-is-a-long-secret-key-32+chars".getBytes(StandardCharsets.UTF_8);  
-    private static final long EXPIRATION_MS = 1000L * 60 * 60 * 24;
+    private static final String SECRET_STRING = "this-is-a-long-secret-key-32+chars-please-change-me";
+    private static final SecretKey KEY = Keys.hmacShaKeyFor(SECRET_STRING.getBytes(StandardCharsets.UTF_8));
+    private static final long EXPIRATION_MS = 1000L * 60 * 60 * 24; // 24 hours
 
-    @SuppressWarnings("deprecation")
     public String generateToken(Long userId, UserRole role, String email) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + EXPIRATION_MS);
 
         return Jwts.builder()
-                .setSubject(String.valueOf(userId))
+                .subject(String.valueOf(userId))
                 .claim("role", role.name())
                 .claim("email", email)
-                .setIssuedAt(now)
-                .setExpiration(expiry)
-                .signWith(SignatureAlgorithm.HS256, SECRET)
+                .issuedAt(now)
+                .expiration(expiry)
+                .signWith(KEY)
                 .compact();
     }
 
-    @SuppressWarnings("deprecation")
     public Claims getClaims(String token) {
-        return Jwts.parser()                 // JwtParserBuilder
-                .setSigningKey(SECRET)
-                .build()                     // 👈 BURASI EKSİKTİ
-                .parseClaimsJws(token)       // Artık JwtParser üstünde çağrılıyor
-                .getBody();
+        return Jwts.parser()
+                .verifyWith(KEY)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
     }
-    
 
     public Long getUserId(String token) {
         return Long.valueOf(getClaims(token).getSubject());

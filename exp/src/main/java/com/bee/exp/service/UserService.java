@@ -4,7 +4,7 @@ import com.bee.exp.domain.Company;
 import com.bee.exp.domain.Profile;
 import com.bee.exp.domain.SubscriptionTier;
 import com.bee.exp.domain.User;
-import com.bee.exp.domain.UserRole;   // 🔹 UserRole enum
+import com.bee.exp.domain.UserRole;
 import com.bee.exp.repository.CompanyRepository;
 import com.bee.exp.repository.ProfileRepository;
 import com.bee.exp.repository.UserRepository;
@@ -22,30 +22,42 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
 
     /**
-     * Esas register metodu:
-     *  - UserRole alır
-     *  - User + Profile oluşturur
-     *  - UserRole.COMPANY ise Company kaydı açar
+     * Main register method:
+     *  - Accepts UserRole
+     *  - Creates User + Profile
+     *  - Creates Company record if UserRole is COMPANY
      */
     public User registerUser(String email,
                              String rawPassword,
                              String fullName,
-                             UserRole roleEnum) {
+                             UserRole roleEnum,
+                             Long companyId) {
 
         if (email == null || rawPassword == null || roleEnum == null) {
             throw new IllegalArgumentException("Email, password and role are required");
+        }
+
+        if (userRepository.findByEmail(email).isPresent()) {
+            throw new RuntimeException("Email already in use");
         }
 
         User user = User.builder()
                 .email(email)
                 .fullName(fullName != null ? fullName : email)
                 .passwordHash(passwordEncoder.encode(rawPassword))
-                .role(roleEnum)   // ✅ User.builder().role(UserRole)
+                .role(roleEnum)
                 .build();
+        
+        // ---- Link to Existing Company if provided ----
+        if (roleEnum == UserRole.COMPANY && companyId != null) {
+            Company company = companyRepository.findById(companyId)
+                    .orElseThrow(() -> new RuntimeException("Selected company not found"));
+            user.setCompany(company);
+        }
 
         User saved = userRepository.save(user);
 
-        // ---- PROFILE oluştur ----
+        // ---- Create PROFILE ----
         Profile profile = Profile.builder()
                 .user(saved)
                 .xpPoints(0)
@@ -56,8 +68,13 @@ public class UserService {
                 .build();
         profileRepository.save(profile);
 
-        // ---- COMPANY rolü ise firma kaydı aç ----
-        if (roleEnum == UserRole.COMPANY) {
+        // ---- Create Company if role is COMPANY AND NO ID PROVIDED (Fallback/Legacy) ----
+        if (roleEnum == UserRole.COMPANY && companyId == null) {
+             // Opsiyonel: Eğer şirket seçilmediyse otomatik oluşturulsun mu?
+             // Senin isteğine göre burayı devre dışı bırakabiliriz veya 
+             // "Eğer seçmediyse yeni oluşturuyor demektir" diye varsayabiliriz.
+             // Şimdilik, eski mantığı koruyarak "seçmediyse yeni oluştur" yapalım, 
+             // böylece sistem esnek kalır.
             Company company = Company.builder()
                     .name(fullName != null ? fullName : email)
                     .description("Auto-created company for " + email)
@@ -67,15 +84,16 @@ public class UserService {
                     .isVerified(false)
                     .build();
 
-            companyRepository.save(company);
+            Company savedCompany = companyRepository.save(company);
+            saved.setCompany(savedCompany); // User'ı da güncelle
+            userRepository.save(saved);
         }
 
         return saved;
     }
 
     /**
-     * Eğer dışarıdan String role ile register almak istersen:
-     * "ENGINEER", "COMPANY", "MENTOR", "ADMIN" gibi.
+     * Register with String role (e.g., from generic API request)
      */
     public User register(String email,
                          String rawPassword,
@@ -96,6 +114,6 @@ public class UserService {
             );
         }
 
-        return registerUser(email, rawPassword, fullName, roleEnum);
+        return registerUser(email, rawPassword, fullName, roleEnum, null);
     }
 }
