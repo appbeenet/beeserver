@@ -48,5 +48,17 @@ public class Task {
     public void preUpdate() {
         updatedAt = Instant.now();
     }
+
+    // Toplam HD bütçesi (ör: 1000 HD)
+    @Column(name = "budget_hd")
+    private Integer budgetHd;
+
+    // Görevin zorluk taban XP’si (örn: Tier 2 = 250 XP)
+    @Column(name = "base_xp")
+    private Integer baseXp;
+
+    // Deadline, hız bonusu için (opsiyonel ama şimdiden koymak iyi)
+    @Column(name = "deadline_at")
+    private Instant deadlineAt;
 }
 

@@ -56,11 +56,13 @@ public class TaskController {
             @RequestBody TaskCreateRequest req
     ) {
         Task task = Task.builder()
-                .title(req.getTitle())
-                .description(req.getDescription())
-                .difficulty(req.getDifficulty())
-                .price(req.getPrice())
-                .build();
+            .title(req.getTitle())
+            .description(req.getDescription())
+            .difficulty(req.getDifficulty())
+            .price(req.getPrice())
+            .budgetHd(req.getPrice() != null ? req.getPrice().intValue() : 0)
+            .baseXp(250) // xpService varsa
+            .build();
 
         Task saved = taskService.createTask(task, currentUser);
         return ResponseEntity.ok(toResponse(saved, currentUser));

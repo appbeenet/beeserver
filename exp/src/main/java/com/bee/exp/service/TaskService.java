@@ -18,7 +18,8 @@ public class TaskService {
     private final TaskRepository taskRepository;
     private final CompanyRepository companyRepository;
     private final TaskSubmissionRepository submissionRepository;
-    private final XpService xpService;
+    private final XpService xpService;              // varsa kalsın
+    private final RewardEngineService rewardEngine; // 🔥 yeni ekledik
 
     /**
      * Firma sahibi yeni task oluşturur.
@@ -220,17 +221,14 @@ public class TaskService {
         submission.setStatus(SubmissionStatus.APPROVED);
         submission.setApprovedAt(Instant.now());
         submission.setApprovedBy(reviewer);
+        submission.setQualityScore(4.0);
 
-        int xp = calcXpForTask(submission.getTask());
-        submission.setXpAwarded(xp);
-
-        xpService.grantXp(submission.getEngineer(), xp);
+        Task task = submission.getTask();
+        rewardEngine.processRewards(task, submission, reviewer);
 
         TaskSubmission saved = submissionRepository.save(submission);
 
-        // İstersen: en az bir APPROVED submission varsa task’i COMPLETED yap
-        Task task = submission.getTask();
-        if (task.getStatus() != TaskStatus.COMPLETED) {
+        if (task != null && task.getStatus() != TaskStatus.COMPLETED) {
             task.setStatus(TaskStatus.COMPLETED);
             task.setUpdatedAt(Instant.now());
             taskRepository.save(task);

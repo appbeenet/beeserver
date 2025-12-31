@@ -66,4 +66,12 @@ public class TaskSubmission {
             status = SubmissionStatus.PENDING;
         }
     }
+
+    // Mentor kalite puanı (1.0 - 5.0)
+    @Column(name = "quality_score")
+    private Double qualityScore;
+
+    // Mentor inceleme yorumu
+    @Column(length = 2000)
+    private String mentorComment;
 }
