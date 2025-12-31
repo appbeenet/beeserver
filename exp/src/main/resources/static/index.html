@@ -684,9 +684,17 @@
                 </button>`;
             } else if (submittedByMe) {
               actionHtml = `
-                <span class="text-[10px] px-2 py-1 rounded-full border border-emerald-400 text-emerald-300">
-                  Submit edildi • Onay bekliyor
-                </span>`;
+                <div class="flex flex-col items-end gap-1">
+                  <span class="text-[10px] px-2 py-1 rounded-full border border-emerald-400 text-emerald-300">
+                    Submit edildi • Onay bekliyor
+                  </span>
+                  <button
+                    class="text-[11px] px-3 py-1 rounded-full border border-red-400 text-red-300 hover:bg-red-400 hover:text-slate-900 transition"
+                    onclick="withdrawTask('${task.id}')"
+                  >
+                    Gönderimi Geri Al
+                  </button>
+                </div>`;
             }
           }
 
@@ -702,7 +710,7 @@
                 ${price !== "" ? ' • Ödül: <span class="text-yellow-300">' + price + '</span>' : ""}
               </p>
             </div>
-            <div class="ml-3">
+            <div class="ml-3 flex-shrink-0">
               ${actionHtml}
             </div>
           `;
@@ -796,6 +804,42 @@
       } catch (err) {
         console.error(err);
         alert(err.message || "Görev submit edilirken bir hata oluştu.");
+      }
+    }
+
+    // Junior: Gönderimi geri al (withdraw)
+    async function withdrawTask(taskId) {
+      if (!authToken) {
+        alert("Gönderimi geri almak için giriş yapmalısın.");
+        return;
+      }
+
+      if (!confirm("Gönderimini geri almak istediğine emin misin? Mentor / firma tekrar göremeyecek, yeniden submit edebilirsin.")) {
+        return;
+      }
+
+      try {
+        const res = await fetch(API_BASE + "/api/tasks/" + taskId + "/withdraw", {
+          method: "POST",
+          headers: {
+            "Authorization": "Bearer " + authToken
+          }
+        });
+
+        if (!res.ok) {
+          let msg = "Gönderim geri alınamadı.";
+          try {
+            const errData = await res.json();
+            if (errData && errData.message) msg = errData.message;
+          } catch (_) {}
+          throw new Error(msg);
+        }
+
+        alert("Gönderim geri alındı. Görevi üzerinde çalışmaya devam edip tekrar submit edebilirsin.");
+        await loadTasks();
+      } catch (err) {
+        console.error(err);
+        alert(err.message || "Gönderim geri alınırken bir hata oluştu.");
       }
     }
 
