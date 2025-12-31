@@ -33,6 +33,9 @@ public class TaskSubmission {
      * Junior’ın submit ettiği zaman.
      * Claim aşamasında da kayıt açarsak, ilk persist’te dolacak.
      */
+    @Column(name = "claimed_at")
+    private Instant claimedAt;
+
     private Instant submittedAt;
 
     /**
@@ -41,6 +44,10 @@ public class TaskSubmission {
      *  - APPROVED: Onaylandı, XP verildi
      *  - REJECTED: Reddedildi (ileride kullanabiliriz)
      */
+    // 👇 Claim → Submit arası toplam süre (dakika)
+    @Column(name = "completion_minutes")
+    private Integer completionMinutes;
+
     @Enumerated(EnumType.STRING)
     private SubmissionStatus status;
 
@@ -63,7 +70,7 @@ public class TaskSubmission {
             submittedAt = Instant.now();
         }
         if (status == null) {
-            status = SubmissionStatus.PENDING;
+            status = SubmissionStatus.DRAFT;
         }
     }
 

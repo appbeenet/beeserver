@@ -92,10 +92,11 @@ public class TaskService {
 
         // Claim kaydı: notes boş, attachment boş, PENDING
         TaskSubmission claim = TaskSubmission.builder()
-                .task(task)
-                .engineer(engineer)
-                .status(SubmissionStatus.PENDING)
-                .build();
+            .task(task)
+            .engineer(engineer)
+            .claimedAt(Instant.now())
+            .status(SubmissionStatus.DRAFT)
+            .build();
 
         submissionRepository.save(claim);
 
@@ -110,31 +111,73 @@ public class TaskService {
     public TaskSubmission submitTask(Long taskId, User engineer, String notes, String attachmentUrl) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new RuntimeException("Task not found"));
-
+    
         TaskSubmission submission = submissionRepository.findByTaskAndEngineer(task, engineer)
                 .orElseGet(() -> TaskSubmission.builder()
                         .task(task)
                         .engineer(engineer)
+                        .claimedAt(Instant.now())
+                        .status(SubmissionStatus.DRAFT)
                         .build()
                 );
-
+    
+        // APPROVED veya REJECTED olmuş submission tekrar güncellenmesin
+        if (submission.getStatus() == SubmissionStatus.APPROVED ||
+            submission.getStatus() == SubmissionStatus.REJECTED) {
+            throw new RuntimeException("This task submission is already finalized and cannot be changed.");
+        }
+    
         submission.setNotes(notes);
         submission.setAttachmentUrl(attachmentUrl);
+    
+        Instant now = Instant.now();
+        submission.setSubmittedAt(now);
         submission.setStatus(SubmissionStatus.PENDING);
-        submission.setSubmittedAt(Instant.now());
-
+    
+        if (submission.getClaimedAt() != null) {
+            long minutes = java.time.Duration.between(submission.getClaimedAt(), now).toMinutes();
+            submission.setCompletionMinutes((int) minutes);
+        }
+    
         TaskSubmission saved = submissionRepository.save(submission);
-
-        // En az bir submission varsa task status SUBMITTED
+    
+        // Task state: SUBMITTED
         if (task.getStatus() == TaskStatus.PUBLISHED || task.getStatus() == TaskStatus.CLAIMED) {
             task.setStatus(TaskStatus.SUBMITTED);
             task.setUpdatedAt(Instant.now());
             taskRepository.save(task);
         }
-
+    
         return saved;
     }
-
+    
+    public TaskSubmission withdrawSubmission(Long taskId, User engineer) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new RuntimeException("Task not found"));
+    
+        TaskSubmission submission = submissionRepository.findByTaskAndEngineer(task, engineer)
+                .orElseThrow(() -> new RuntimeException("No submission found for this task and engineer"));
+    
+        if (submission.getStatus() != SubmissionStatus.PENDING) {
+            throw new RuntimeException("Only PENDING submissions can be withdrawn.");
+        }
+    
+        // Mentor listelerinden düşsün
+        submission.setStatus(SubmissionStatus.DRAFT);
+        submission.setSubmittedAt(null);
+        submission.setCompletionMinutes(null);
+        TaskSubmission saved = submissionRepository.save(submission);
+    
+        // Task durumunu tekrar CLAIMED'e çek (istersen SUBMITTED bırakabilirsin ama daha temiz)
+        if (task.getStatus() == TaskStatus.SUBMITTED) {
+            task.setStatus(TaskStatus.CLAIMED);
+            task.setUpdatedAt(Instant.now());
+            taskRepository.save(task);
+        }
+    
+        return saved;
+    }
+    
     /**
      * Eski task bazlı approve (istersen kullanma, submission bazlı approve daha esnek).
      */

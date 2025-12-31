@@ -97,11 +97,19 @@ public class RewardEngineService {
     }
 
     private boolean checkSpeedBonus(Task task, TaskSubmission submission) {
-        if (task.getDeadlineAt() == null || submission.getSubmittedAt() == null) {
+        if (submission.getClaimedAt() == null || submission.getSubmittedAt() == null) {
             return false;
         }
-        return submission.getSubmittedAt().isBefore(task.getDeadlineAt());
+    
+        long minutes = java.time.Duration.between(
+                submission.getClaimedAt(),
+                submission.getSubmittedAt()
+        ).toMinutes();
+    
+        // Örn: 24 saat (1440 dk) altındaysa hız bonusu ver
+        return minutes <= 1440;
     }
+    
 
     private Profile getOrCreateProfile(User user) {
         return profileRepository.findByUser(user)

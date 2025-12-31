@@ -49,6 +49,15 @@ public class TaskController {
                 .map(t -> toResponse(t, currentUser))
                 .toList();
     }
+    
+    @PostMapping("/{id}/withdraw")
+    public ResponseEntity<Void> withdraw(
+            @PathVariable("id") Long id,
+            @AuthenticationPrincipal User currentUser
+    ) {
+        taskService.withdrawSubmission(id, currentUser);
+        return ResponseEntity.ok().build();
+    }
 
     @PostMapping
     public ResponseEntity<TaskResponse> create(
